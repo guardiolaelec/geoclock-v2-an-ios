@@ -1,0 +1,5 @@
+{
+  "name": "GeoClock - Fichaje Geocalizado",
+  "description": "Aplicación de fichaje para trabajadores con validación de geolocalización por sede.",
+  "requestFramePermissions": ["geolocation", "allow-downloads"]
+}
