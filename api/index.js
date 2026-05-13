@@ -148,11 +148,19 @@ app.post("/api/clock", async (req, res) => {
       minutos_extra: req.body.minutos_extra || 0,
       estado_extra: req.body.estado_extra || 'N/A'
     };
-    const { data, error } = await supabase.from('fichajes').insert([nuevoFichajeEspañol]).select();
-    if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json(data[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // CAMBIO PARA MODO PRUEBA: Comentamos la validación real 
+    /*
+const { data: estaDentroDelRango, error: geoError } = await supabase.rpc('validar_proximidad', { ... });
+if (!estaDentroDelRango) { return res.status(403).json({ error: "Fuera de rango" }); }
+*/
+
+// Forzamos que siempre sea verdadero para que puedan fichar desde casa o cualquier sitio
+const estaDentroDelRango = true;
+    //const { data, error } = await supabase.from('fichajes').insert([nuevoFichajeEspañol]).select();
+    //if (error) return res.status(400).json({ error: error.message });
+    //res.status(201).json(data[0]);
+  //} catch (err) {
+    //res.status(500).json({ error: err.message });
   }
 });
 
