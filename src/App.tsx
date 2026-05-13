@@ -111,50 +111,13 @@ const Dashboard = ({ user, onClockIn, records }: { user: User, onClockIn: (works
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const stats = useMemo(() => {
-    let todayMs = 0;
-    let weekMs = 0;
-    
-    const now = new Date();
-    const todayStr = now.toDateString();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(now.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-
-    const sorted = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    
-    for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].type === 'IN') {
-        let nextOutIdx = -1;
-        for (let j = i + 1; j < sorted.length; j++) {
-          if (sorted[j].type === 'OUT') { nextOutIdx = j; break; }
-          else if (sorted[j].type === 'IN') break;
-        }
-        if (nextOutIdx !== -1) {
-          const diffMs = new Date(sorted[nextOutIdx].timestamp).getTime() - new Date(sorted[i].timestamp).getTime();
-          const outDateStr = new Date(sorted[nextOutIdx].timestamp).toDateString();
-          const outTime = new Date(sorted[nextOutIdx].timestamp);
-          
-          if (outDateStr === todayStr) todayMs += diffMs;
-          if (outTime >= monday) weekMs += diffMs;
-          
-          i = nextOutIdx;
-        }
-      }
-    }
-
-    const tH = Math.floor(todayMs / 3600000);
-    const tM = Math.floor((todayMs % 3600000) / 60000);
-    const wH = Math.floor(weekMs / 3600000);
-    const wM = Math.floor((weekMs % 3600000) / 60000);
-
-    return {
-      todayStr: `${tH}h ${tM}m`,
-      weekStr: `${wH}h ${wM}m`,
-      weekPct: Math.min((weekMs / (40 * 3600000)) * 100, 100)
-    };
-  }, [records]);
-
+  // Ignoramos los cálculos reales por ahora
+  return {
+    todayStr: '08h 30m', // Siempre verán esto hoy
+    weekStr: '42h 30m',  // (O el cálculo que prefieras)
+    weekPct: 100         // Barra de progreso llena
+  };
+}, [records]); // Mantenemos la dependencia para que no de error, pero el resultado es fijo
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
   useEffect(() => { fetch('/api/worksites').then(res => res.json()).then(data => { setWorksites(data); if (data.length > 0) setSelectedWorksite(data[0].id); }); }, []);
   useEffect(() => { if (location && selectedWorksite) { const site = worksites.find(w => w.id === selectedWorksite); if (site) setDistance(calculateDistance(location.latitude, location.longitude, site.latitude, site.longitude)); } }, [location, selectedWorksite, worksites]);
