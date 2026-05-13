@@ -17,17 +17,23 @@ const supabase = createClient(
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password);
+    // Traemos los usuarios para comparar en JS y limpiar caracteres invisibles (\r)
+    const { data: users, error } = await supabase.from('users').select('*');
     if (error) return res.status(400).json({ error: error.message });
-    if (!data || data.length === 0) return res.status(401).json({ error: "Credenciales inválidas" });
-    const user = data[0];
+
+    const user = users.find(u => {
+      const dbEmail = u.email ? u.email.trim().toLowerCase() : '';
+      const dbPass = u.password ? u.password.trim() : ''; // Esto ignora el \r
+      return dbEmail === email.trim().toLowerCase() && dbPass === password.trim();
+    });
+
+    if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ==========================================
 // 2. USUARIOS
 // ==========================================
@@ -135,32 +141,27 @@ app.get("/api/admin/records", async (req, res) => {
 
 app.post("/api/clock", async (req, res) => {
   try {
-    const tipoTraducido = req.body.type === 'IN' ? 'Entrada Jornada' : 'Salida Jornada';
-    const nuevoFichajeEspañol = {
-      empleado_id: req.body.user_id, 
-      sede_id: req.body.worksite_id, 
+    const { user_id, worksite_id, type, latitude, longitude, distance, notes, minutos_extra, estado_extra } = req.body;
+    const tipoTraducido = type === 'IN' ? 'Entrada Jornada' : 'Salida Jornada';
+    
+    const nuevoFichaje = {
+      empleado_id: user_id, 
+      sede_id: worksite_id, 
       tipo: tipoTraducido, 
-      latitud: req.body.latitude, 
-      longitud: req.body.longitude, 
-      distancia_metros: req.body.distance, 
-      notes: req.body.notes || '', 
+      latitud: latitude, 
+      longitud: longitude, 
+      distancia_metros: distance, 
+      notes: notes || '', 
       fecha_hora: new Date().toISOString(),
-      minutos_extra: req.body.minutos_extra || 0,
-      estado_extra: req.body.estado_extra || 'N/A'
+      minutos_extra: minutos_extra || 0,
+      estado_extra: estado_extra || 'N/A'
     };
-    // CAMBIO PARA MODO PRUEBA: Comentamos la validación real 
-    /*
-const { data: estaDentroDelRango, error: geoError } = await supabase.rpc('validar_proximidad', { ... });
-if (!estaDentroDelRango) { return res.status(403).json({ error: "Fuera de rango" }); }
-*/
 
-// Forzamos que siempre sea verdadero para que puedan fichar desde casa o cualquier sitio
-const estaDentroDelRango = true;
-    //const { data, error } = await supabase.from('fichajes').insert([nuevoFichajeEspañol]).select();
-    //if (error) return res.status(400).json({ error: error.message });
-    //res.status(201).json(data[0]);
-  //} catch (err) {
-    //res.status(500).json({ error: err.message });
+    const { data, error } = await supabase.from('fichajes').insert([nuevoFichaje]).select();
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
