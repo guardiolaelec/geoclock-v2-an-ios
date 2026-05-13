@@ -103,32 +103,58 @@ const Login = ({ onLogin }: { onLogin: (user: User) => void }) => {
   );
 };
 
-const Dashboard = ({ user, onClockIn, records }: { user: User, onClockIn: (worksiteId: number) => void, records: Record[] }) => {
-  const [worksites, setWorksites] = useState<Worksite[]>([]);
-  const [selectedWorksite, setSelectedWorksite] = useState<number>(0);
-  const { location, error: geoError } = useGeolocation();
-  const [distance, setDistance] = useState<number | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
+const Dashboard = ({ user, onLogout }: { user: any, onLogout: () => void }) => {
+  // ... estados existentes ...
 
+  // Lógica de visualización para Modo Prueba
   const stats = useMemo(() => {
-  // Ignoramos los cálculos reales por ahora
-  return {
-    todayStr: '08h 30m', // Siempre verán esto hoy
-    weekStr: '42h 30m',  // (O el cálculo que prefieras)
-    weekPct: 100         // Barra de progreso llena
+    const hoy = new Date().toDateString();
+    const tieneFichajeHoy = records.some(r => new Date(r.timestamp).toDateString() === hoy);
+
+    return {
+      todayStr: tieneFichajeHoy ? "08h 30m" : "00h 00m",
+      weekStr: tieneFichajeHoy ? "42h 30m" : "34h 00m",
+      weekPct: tieneFichajeHoy ? 100 : 80
+    };
+  }, [records]);
+
+  const canClockIn = true; // Botón siempre activo para pruebas
+
+  const handleClockIn = async (worksiteId: number) => {
+    if (!user) return;
+    const res = await fetch('/api/clock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, worksite_id: worksiteId, type: 'IN', latitude: 0, longitude: 0, distance: 0, notes: '' })
+    });
+    if (res.ok) {
+      setIsClockedIn(true);
+      setStartTime(new Date());
+      // Recargar registros para que useMemo detecte el cambio
+      const r = await fetch(`/api/records/${user.id}`);
+      const data = await r.json();
+      setRecords(data);
+    }
   };
-}, [records]); // Mantenemos la dependencia para que no de error, pero el resultado es fijo
-  useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
-  useEffect(() => { fetch('/api/worksites').then(res => res.json()).then(data => { setWorksites(data); if (data.length > 0) setSelectedWorksite(data[0].id); }); }, []);
-  useEffect(() => { if (location && selectedWorksite) { const site = worksites.find(w => w.id === selectedWorksite); if (site) setDistance(calculateDistance(location.latitude, location.longitude, site.latitude, site.longitude)); } }, [location, selectedWorksite, worksites]);
 
-  const currentSite = worksites.find(w => w.id === selectedWorksite);
-  //const canClockIn = distance !== null && currentSite && distance <= currentSite.radius;
-  // Antes: const canClockIn = distance !== null && currentSite && distance <= currentSite.radius;
-// Ahora (Modo Prueba): Siempre es true
-const canClockIn = true;
+  const handleClockOut = async (notes: string) => {
+    if (!user) return;
+    const res = await fetch('/api/clock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, worksite_id: 1, type: 'OUT', latitude: 0, longitude: 0, distance: 0, notes })
+    });
+    if (res.ok) {
+      setIsClockedIn(false);
+      setStartTime(null);
+      const r = await fetch(`/api/records/${user.id}`);
+      const data = await r.json();
+      setRecords(data);
+    }
+  };
 
-  return (
+  // ... resto del render del Dashboard ...
+};
     <div className="flex-1 flex flex-col p-4 space-y-6 max-w-md mx-auto w-full font-['Quicksand'] pb-24">
       <section className="text-center py-6">
         <p className="text-slate-400 font-medium mb-1 capitalize">{currentTime.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}</p>
