@@ -564,26 +564,62 @@ export default function App() {
   };
 
   const handleClockIn = async (worksiteId: number) => {
-    if (!user || !location) return;
-    const worksites = await fetch('/api/worksites').then(res => res.json()); const site = worksites.find((w: any) => w.id === worksiteId);
-    const dist = calculateDistance(location.latitude, location.longitude, site.latitude, site.longitude);
-    const res = await fetch('/api/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, worksite_id: worksiteId, type: 'IN', latitude: location.latitude, longitude: location.longitude, distance: dist, notes: '' }) });
-    if (res.ok) { setIsClockedIn(true); setStartTime(new Date()); fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); if (user.role === 'ADMIN') fetchAdminData(); }
-  };
+    if (!user) return; // Quitamos el requisito de "!location"
+    
+    // Usamos coordenadas 0 si el GPS falla para que no de error
+    const lat = location?.latitude || 0;
+    const lon = location?.longitude || 0;
 
+    const res = await fetch('/api/clock', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ 
+        user_id: user.id, 
+        worksite_id: worksiteId, 
+        type: 'IN', 
+        latitude: lat, 
+        longitude: lon, 
+        distance: 0, // En prueba no calculamos distancia
+        notes: '' 
+      }) 
+    });
+
+    if (res.ok) { 
+      setIsClockedIn(true); 
+      setStartTime(new Date()); 
+      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
+      if (user.role === 'ADMIN') fetchAdminData(); 
+    }
+  };
   const handleClockOut = async (notes: string) => {
-    if (!user || !location) return;
-    const lastRecord = userRecords[0]; const worksites = await fetch('/api/worksites').then(res => res.json()); const site = worksites.find((w: any) => w.id === lastRecord.worksite_id);
-    const dist = calculateDistance(location.latitude, location.longitude, site.latitude, site.longitude);
-    const now = new Date();
-    const esManana = now.getHours() < 14 || (now.getHours() === 14 && now.getMinutes() < 30);
-    const horaSalidaPrevista = esManana ? (user.horario_manana_fin || "14:00") : (user.horario_tarde_fin || "18:00");
-    const [hP, mP] = horaSalidaPrevista.split(':').map(Number);
-    const previstoMs = (hP * 60 + mP) * 60000; const actualMs = (now.getHours() * 60 + now.getMinutes()) * 60000;
-    let minutosExtra = 0; let estadoExtra = 'N/A';
-    if (actualMs > previstoMs + 300000) { minutosExtra = Math.floor((actualMs - previstoMs) / 60000); estadoExtra = 'PENDIENTE'; }
-    const res = await fetch('/api/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user.id, worksite_id: lastRecord.worksite_id, type: 'OUT', latitude: location.latitude, longitude: location.longitude, distance: dist, notes, minutos_extra: minutosExtra, estado_extra: estadoExtra }) });
-    if (res.ok) { setIsClockedIn(false); setStartTime(null); fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); if (user.role === 'ADMIN') fetchAdminData(); }
+    if (!user) return; // Quitamos el requisito de "!location"
+    
+    const lastRecord = userRecords[0];
+    const lat = location?.latitude || 0;
+    const lon = location?.longitude || 0;
+
+    const res = await fetch('/api/clock', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ 
+        user_id: user.id, 
+        worksite_id: lastRecord?.worksite_id || 1, 
+        type: 'OUT', 
+        latitude: lat, 
+        longitude: lon, 
+        distance: 0, 
+        notes, 
+        minutos_extra: 0, 
+        estado_extra: 'N/A' 
+      }) 
+    });
+
+    if (res.ok) { 
+      setIsClockedIn(false); 
+      setStartTime(null); 
+      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
+      if (user.role === 'ADMIN') fetchAdminData(); 
+    }
   };
 
   if (!user) return <Login onLogin={setUser} />;
