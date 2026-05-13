@@ -160,7 +160,10 @@ const Dashboard = ({ user, onClockIn, records }: { user: User, onClockIn: (works
   useEffect(() => { if (location && selectedWorksite) { const site = worksites.find(w => w.id === selectedWorksite); if (site) setDistance(calculateDistance(location.latitude, location.longitude, site.latitude, site.longitude)); } }, [location, selectedWorksite, worksites]);
 
   const currentSite = worksites.find(w => w.id === selectedWorksite);
-  const canClockIn = distance !== null && currentSite && distance <= currentSite.radius;
+  //const canClockIn = distance !== null && currentSite && distance <= currentSite.radius;
+  // Antes: const canClockIn = distance !== null && currentSite && distance <= currentSite.radius;
+// Ahora (Modo Prueba): Siempre es true
+const canClockIn = true;
 
   return (
     <div className="flex-1 flex flex-col p-4 space-y-6 max-w-md mx-auto w-full font-['Quicksand'] pb-24">
