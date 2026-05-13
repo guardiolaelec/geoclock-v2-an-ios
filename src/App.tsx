@@ -150,7 +150,7 @@ const canClockIn = true;
           <MapPin className={`w-4 h-4 ${canClockIn ? 'text-green-500' : 'text-[#ff8c00]'}`} />
           <p className={`text-xs font-medium ${canClockIn ? 'text-green-500' : 'text-slate-400'}`}>{canClockIn ? `¡Estás en la sede (a ${distance?.toFixed(1)}m)! Puedes fichar.` : `Solo disponible a menos de ${currentSite?.radius || 10}m de la sede (Estás a ${distance !== null ? distance.toFixed(1) : '?'}m)`}</p>
         </div>
-        {geoError && <p className="text-red-500 text-[10px] font-bold mt-2 uppercase w-full text-center">⚠️ Error GPS: {geoError}</p>}
+        
       </section>
 
       <section className="flex justify-center pb-4">
