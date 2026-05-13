@@ -114,31 +114,8 @@ app.delete(["/api/worksites/:id", "/api/admin/worksites/:id"], async (req, res) 
 });
 
 // ==========================================
-// 4. FICHAJES Y HORAS EXTRA
+// 4. FICHAJES (MODO PRUEBA - SIN BLOQUEOS)
 // ==========================================
-app.get("/api/records/:id", async (req, res) => {
-  const { id } = req.params;
-  const { data, error } = await supabase.from('fichajes').select('*, sedes(nombre)').eq('empleado_id', id).order('fecha_hora', { ascending: false });
-  if (error || !data) return res.json([]);
-  
-  const formateado = data.map(r => ({
-    id: r.id, user_id: r.empleado_id, worksite_id: r.sede_id, type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', latitude: r.latitud, longitude: r.longitud, distance: r.distancia_metros, notes: r.notes, timestamp: r.fecha_hora, worksite_name: r.sedes?.nombre || 'Sede desconocida',
-    minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
-  }));
-  res.json(formateado);
-});
-
-app.get("/api/admin/records", async (req, res) => {
-  const { data, error } = await supabase.from('fichajes').select('*, users(name), sedes(nombre)').order('fecha_hora', { ascending: false });
-  if (error || !data) return res.json([]);
-  
-  const formateado = data.map(r => ({
-    id: r.id, user_id: r.empleado_id, worksite_id: r.sede_id, type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', latitude: r.latitud, longitude: r.longitud, distance: r.distancia_metros, notes: r.notes, timestamp: r.fecha_hora, user_name: r.users?.name || 'Usuario desconocido', worksite_name: r.sedes?.nombre || 'Sede desconocida',
-    minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
-  }));
-  res.json(formateado);
-});
-
 app.post("/api/clock", async (req, res) => {
   try {
     const { user_id, worksite_id, type, latitude, longitude, distance, notes, minutos_extra, estado_extra } = req.body;
@@ -148,29 +125,29 @@ app.post("/api/clock", async (req, res) => {
       empleado_id: user_id, 
       sede_id: worksite_id, 
       tipo: tipoTraducido, 
-      latitud: latitude, 
-      longitud: longitude, 
-      distancia_metros: distance, 
+      latitud: latitude || 0, 
+      longitud: longitude || 0, 
+      distancia_metros: distance || 0, 
       notes: notes || '', 
       fecha_hora: new Date().toISOString(),
       minutos_extra: minutos_extra || 0,
       estado_extra: estado_extra || 'N/A'
     };
 
+    // Guardamos directamente en Supabase sin preguntar al GPS
     const { data, error } = await supabase.from('fichajes').insert([nuevoFichaje]).select();
-    if (error) return res.status(400).json({ error: error.message });
+    
+    if (error) {
+      console.error("Error Supabase:", error);
+      return res.status(400).json({ error: error.message });
+    }
+    
     res.status(201).json(data[0]);
+
   } catch (err) {
+    console.error("Error Servidor:", err);
     res.status(500).json({ error: err.message });
   }
-});
-
-app.get("/api/status/:id", async (req, res) => {
-  const { data } = await supabase.from('fichajes').select('*').eq('empleado_id', req.params.id).order('fecha_hora', { ascending: false }).limit(1);
-  if (data && data.length > 0 && data[0].tipo === 'Entrada Jornada') {
-    return res.json({ isClockedIn: true, startTime: data[0].fecha_hora });
-  }
-  res.json({ isClockedIn: false, startTime: null });
 });
 
 // ==========================================
