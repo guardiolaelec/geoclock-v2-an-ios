@@ -546,4 +546,38 @@ export default function App() {
                ) : (
                  <>
                    {activeTab === 'home' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
-                   {activeTab === 'history' && <HistoryView records={userRecords} user
+                   {activeTab === 'history' && <HistoryView records={userRecords} user={user} onSelectRecord={setSelectedRecord} />}
+                   {activeTab === 'summary' && <WeeklySummaryView records={userRecords} user={user} showToast={(m:string,t:any)=>setToast({message:m,type:t})} />}
+                   {activeTab === 'profile' && <div className="p-8 text-center space-y-4"><UserIcon className="w-20 h-20 mx-auto text-slate-700"/><h2 className="text-2xl font-bold">{user.name}</h2><p className="text-orange-500 font-bold">{user.department}</p></div>}
+                 </>
+               )}
+             </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {!selectedRecord && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 pb-6 pt-3 flex justify-between items-center z-50">
+          {user.role === 'ADMIN' ? (
+            <>
+              <button onClick={() => setActiveTab('admin-dashboard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin-dashboard' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><LayoutDashboard className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Panel</span></button>
+              <button onClick={() => setActiveTab('admin-records')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin-records' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><FileText className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Registros</span></button>
+              <button onClick={() => setActiveTab('admin-clockin')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin-clockin' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><Fingerprint className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Fichar</span></button>
+              <button onClick={() => setActiveTab('admin-users')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin-users' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><Users className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Staff</span></button>
+              <button onClick={() => setActiveTab('admin-worksites')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'admin-worksites' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><Building2 className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Sedes</span></button>
+              <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-[#ff8c00] scale-110' : 'text-slate-600 hover:text-slate-400'}`}><Settings2 className="w-6 h-6" /><span className="text-[9px] font-bold uppercase">Ajustes</span></button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setActiveTab('home')} className={`flex-1 flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-[#ff8c00]' : 'text-slate-500'}`}><Home className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Inicio</span></button>
+              <button onClick={() => setActiveTab('history')} className={`flex-1 flex flex-col items-center gap-1 transition-colors ${activeTab === 'history' ? 'text-[#ff8c00]' : 'text-slate-500'}`}><FileText className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Registros</span></button>
+              <button onClick={() => setActiveTab('summary')} className={`flex-1 flex flex-col items-center gap-1 transition-colors ${activeTab === 'summary' ? 'text-[#ff8c00]' : 'text-slate-500'}`}><BarChart3 className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Resumen</span></button>
+              <button onClick={() => setActiveTab('profile')} className={`flex-1 flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-[#ff8c00]' : 'text-slate-500'}`}><UserIcon className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Perfil</span></button>
+            </>
+          )}
+        </nav>
+      )}
+      <AnimatePresence>{toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}</AnimatePresence>
+    </div>
+  );
+}
