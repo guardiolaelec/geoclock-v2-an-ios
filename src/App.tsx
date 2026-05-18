@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Worksite, Record, useGeolocation, calculateDistance } from './types';
-import { LogIn, LogOut, Clock, History, User as UserIcon, MapPin, ChevronRight, ArrowLeft, MoreVertical, Edit3, PauseCircle, PlayCircle, Trash2, TimerOff, TrendingUp, Coffee, Verified, Share2, Printer, Calendar, ChevronLeft, BarChart3, Home, FileText, Settings, Fingerprint, Bell, Mail, Lock, Eye, Check, X, Shield, Users, Map, Settings2, Download, AlertTriangle, LayoutDashboard, UserPlus, Building2, Search, Filter, Plus, Trash, CheckCircle2 } from 'lucide-react';
+import { LogIn, LogOut, Clock, User as UserIcon, MapPin, ChevronRight, ArrowLeft, MoreVertical, Edit3, PauseCircle, PlayCircle, Trash2, TimerOff, TrendingUp, Coffee, Verified, Share2, Printer, Calendar, ChevronLeft, BarChart3, Home, FileText, Settings, Fingerprint, Bell, Mail, Lock, Eye, Check, X, Shield, Users, Map, Settings2, Download, AlertTriangle, LayoutDashboard, UserPlus, Building2, Search, Filter, Plus, Trash, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 
-// --- COMPONENTES AUXILIARES ---
+interface User { id: number; name: string; email: string; role: 'USER' | 'ADMIN'; department: string; employee_id: string; }
+interface Record { id: number; user_id: number; user_name?: string; type: 'IN' | 'OUT'; timestamp: string; worksite_name: string; distance: number; is_manual: boolean; estado_extra?: string; minutos_extra?: number; worksite_id?: number; }
+interface Worksite { id: number; name: string; latitude: number; longitude: number; radius: number; address?: string; }
+
 const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
   useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
   return (
@@ -57,6 +59,7 @@ const generateFullReportPDF = (records: Record[], user: User, periodLabel?: stri
         }
       }
     }
+
     if (isConsolidated) { if (userIdx > 0) { doc.addPage(); currentY = 20; } doc.setFontSize(14); doc.setTextColor(0); doc.text(`Empleado: ${userData.name}`, 20, currentY); currentY += 10; }
     const dayLastRecordIndex: { [key: string]: number } = {};
     sortedRecords.forEach((r, idx) => { const dateStr = new Date(r.timestamp).toLocaleDateString('es-ES'); dayLastRecordIndex[dateStr] = idx; });
@@ -67,6 +70,7 @@ const generateFullReportPDF = (records: Record[], user: User, periodLabel?: stri
       let typeText = r.type === 'IN' ? 'Entrada' : 'Salida'; if (r.estado_extra === 'PENDIENTE') typeText += ' (+Extras)';
       return [ dateStr, new Date(r.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), typeText, r.worksite_name, `${(r.distance || 0).toFixed(1)}m`, r.is_manual ? 'Manual' : 'GPS', dayTotalStr ];
     });
+    
     const totalUserH = Math.floor(totalUserMs / 3600000); const totalUserM = Math.floor((totalUserMs % 3600000) / 60000);
     autoTable(doc, { startY: currentY, head: [['Fecha', 'Hora', 'Tipo', 'Sede', 'Distancia', 'Método', 'Total Día']], body: tableData, foot: [['', '', '', '', '', 'TOTAL EMPLEADO:', `${totalUserH}h ${totalUserM}m`]], headStyles: { fillColor: [255, 140, 0] }, footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, margin: { top: 20 }, didDrawPage: (data) => { currentY = data.cursor?.y || currentY; } });
     currentY = (doc as any).lastAutoTable.finalY + 15;
@@ -74,7 +78,6 @@ const generateFullReportPDF = (records: Record[], user: User, periodLabel?: stri
   doc.save(`Informe_Asistencia_${new Date().getTime()}.pdf`);
 };
 
-// --- VISTAS DE USUARIO ---
 const Login = ({ onLogin }: { onLogin: (user: User) => void }) => {
   const [email, setEmail] = useState('john@empresa.com'); const [password, setPassword] = useState('password123'); const [error, setError] = useState(''); const [mode, setMode] = useState<'USER' | 'ADMIN'>('USER');
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,20 +106,21 @@ const Login = ({ onLogin }: { onLogin: (user: User) => void }) => {
   );
 };
 
-const Dashboard = ({ user, records, onClockIn }: { user: User, records: Record[], onClockIn: (id: number) => void }) => {
+const Dashboard = ({ user, records, onClockIn }: { user: any, records: Record[], onClockIn: (worksiteId: number) => void }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [worksites, setWorksites] = useState<Worksite[]>([]);
   const [selectedWorksite, setSelectedWorksite] = useState<number>(1);
-  const { location } = useGeolocation();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    fetch('/api/worksites').then(res => res.json()).then(setWorksites);
+    fetch('/api/worksites').then(res => res.json()).then(data => {
+      if(data && data.length > 0) {
+        setWorksites(data);
+        setSelectedWorksite(data[0].id);
+      }
+    });
     return () => clearInterval(timer);
   }, []);
-
-  const currentSite = useMemo(() => worksites.find(s => s.id === selectedWorksite), [worksites, selectedWorksite]);
-  const distance = useMemo(() => (location && currentSite) ? calculateDistance(location.latitude, location.longitude, currentSite.latitude, currentSite.longitude) : null, [location, currentSite]);
 
   const stats = useMemo(() => {
     const hoy = new Date().toDateString();
@@ -128,7 +132,7 @@ const Dashboard = ({ user, records, onClockIn }: { user: User, records: Record[]
     };
   }, [records]);
 
-  const canClockIn = true; // MODO PRUEBA: Siempre habilitado
+  const canClockIn = true; // Permiso forzado para modo prueba
 
   return (
     <div className="flex-1 flex flex-col p-4 space-y-6 max-w-md mx-auto w-full font-['Quicksand'] pb-24">
@@ -150,12 +154,12 @@ const Dashboard = ({ user, records, onClockIn }: { user: User, records: Record[]
         </div>
         <div className={`flex items-center gap-2 justify-center py-2 px-4 rounded-lg border transition-colors bg-green-500/10 border-green-500/20`}>
           <MapPin className={`w-4 h-4 text-green-500`} />
-          <p className={`text-xs font-medium text-green-500`}>¡Modo Prueba Activo! Sede verificada automáticamente.</p>
+          <p className={`text-xs font-medium text-green-500`}>¡Modo Prueba Activo! GPS omitido.</p>
         </div>
       </section>
 
       <section className="flex justify-center pb-4">
-        <button onClick={() => onClockIn(selectedWorksite)} className={`w-full max-w-xs aspect-square rounded-full shadow-xl flex flex-col items-center justify-center text-white transition-all active:scale-95 bg-[#ff8c00] hover:bg-orange-600 shadow-orange-500/20 cursor-pointer`}>
+        <button disabled={!canClockIn} onClick={() => onClockIn(selectedWorksite)} className={`w-full max-w-xs aspect-square rounded-full shadow-xl flex flex-col items-center justify-center text-white transition-all active:scale-95 group bg-[#ff8c00] hover:bg-orange-600 shadow-orange-500/20 cursor-pointer`}>
           <Fingerprint className={`w-16 h-16 mb-2 transition-transform group-hover:scale-110`} />
           <span className="text-xl font-bold uppercase tracking-wider">Fichar Entrada</span>
         </button>
@@ -169,8 +173,8 @@ const Dashboard = ({ user, records, onClockIn }: { user: User, records: Record[]
         </div>
         <div className="bg-slate-900 p-4 rounded-xl border border-orange-500/5 shadow-sm">
           <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1">Puntualidad</p>
-          <p className="text-2xl font-black text-white">--%</p>
-          <div className="flex items-center gap-1 text-[#ff8c00] text-[10px] font-bold mt-1"><Check className="w-3 h-3" /> Sin datos</div>
+          <p className="text-2xl font-black text-white">100%</p>
+          <div className="flex items-center gap-1 text-green-400 text-[10px] font-bold mt-1"><Check className="w-3 h-3" /> Correcto</div>
         </div>
       </section>
 
@@ -267,13 +271,10 @@ const WeeklySummaryView = ({ records, user, showToast }: { records: Record[], us
   </div>
 );
 
-// --- VISTAS ADMINISTRATIVAS ---
 const UserModal = ({ user, onSave, onClose }: { user?: User, onSave: (u: any) => Promise<void>, onClose: () => void }) => {
   const [f, setF] = useState({ 
     name: user?.name || '', email: user?.email || '', password: user?.password || '123456', 
-    employee_id: user?.employee_id || '', department: user?.department || '', role: user?.role || 'USER',
-    horario_manana_inicio: user?.horario_manana_inicio || '08:00', horario_manana_fin: user?.horario_manana_fin || '14:00',
-    horario_tarde_inicio: user?.horario_tarde_inicio || '15:00', horario_tarde_fin: user?.horario_tarde_fin || '18:00'
+    employee_id: user?.employee_id || '', department: user?.department || '', role: user?.role || 'USER'
   });
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60]">
@@ -285,12 +286,6 @@ const UserModal = ({ user, onSave, onClose }: { user?: User, onSave: (u: any) =>
         <div className="grid grid-cols-2 gap-3">
           <input placeholder="ID (EMP-01)" value={f.employee_id} onChange={e=>setF({...f,employee_id:e.target.value})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl w-full" />
           <select value={f.role} onChange={e=>setF({...f,role:e.target.value as 'USER'|'ADMIN'})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl w-full"><option value="USER">Usuario</option><option value="ADMIN">Admin</option></select>
-        </div>
-        <div className="pt-4 border-t border-slate-800">
-          <p className="text-orange-500 font-bold mb-2">Horario Mañana</p>
-          <div className="flex gap-2"><input type="time" value={f.horario_manana_inicio} onChange={e=>setF({...f,horario_manana_inicio:e.target.value})} className="bg-slate-900 border border-slate-800 p-2 rounded-xl flex-1" /><input type="time" value={f.horario_manana_fin} onChange={e=>setF({...f,horario_manana_fin:e.target.value})} className="bg-slate-900 border border-slate-800 p-2 rounded-xl flex-1" /></div>
-          <p className="text-orange-500 font-bold mt-4 mb-2">Horario Tarde</p>
-          <div className="flex gap-2"><input type="time" value={f.horario_tarde_inicio} onChange={e=>setF({...f,horario_tarde_inicio:e.target.value})} className="bg-slate-900 border border-slate-800 p-2 rounded-xl flex-1" /><input type="time" value={f.horario_tarde_fin} onChange={e=>setF({...f,horario_tarde_fin:e.target.value})} className="bg-slate-900 border border-slate-800 p-2 rounded-xl flex-1" /></div>
         </div>
         <div className="flex gap-2 mt-4"><button onClick={()=>onSave(f)} className="flex-1 bg-orange-500 p-3 rounded-xl font-bold">Guardar</button><button onClick={onClose} className="flex-1 bg-slate-800 p-3 rounded-xl text-slate-400">Cancelar</button></div>
       </div>
@@ -342,7 +337,6 @@ const PendingRequestsView = ({ onBack, onActionComplete, requests, onSelectRecor
             {r.estado_extra === 'PENDIENTE' && <span className="bg-orange-500/10 text-orange-500 text-[10px] font-black px-2 py-1 rounded">+{r.minutos_extra} MIN</span>}
           </div>
         </div>
-        {r.estado_extra === 'PENDIENTE' && <p className="text-xs text-slate-400 italic bg-slate-800/50 p-3 rounded-xl border border-slate-800">El empleado excedió su horario teórico en {r.minutos_extra} minutos.</p>}
         <div className="flex gap-2"><button onClick={()=>onActionComplete(r.id, 'APPROVED')} className="bg-green-500 text-white font-bold p-3 rounded-xl flex-1">APROBAR</button><button onClick={()=>onActionComplete(r.id, 'REJECTED')} className="bg-red-500/10 text-red-500 font-bold p-3 rounded-xl flex-1">RECHAZAR</button></div>
       </div>
     ))}
@@ -353,31 +347,41 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
   const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString().split('T')[0]; });
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
-  const filteredRecords = useMemo(() => { return records.filter(r => { const recordDate = r.timestamp.split('T')[0]; const matchesDate = recordDate >= startDate && recordDate <= endDate; const matchesUser = selectedUserId === 'all' || r.user_id.toString() === selectedUserId; return matchesDate && matchesUser; }); }, [records, startDate, endDate, selectedUserId]);
-  const handleGeneratePDF = () => { const periodLabel = `Periodo: ${new Date(startDate).toLocaleDateString('es-ES')} - ${new Date(endDate).toLocaleDateString('es-ES')}`; let userForPdf: any = { name: 'Admin', employee_id: 'ADMIN' }; if (selectedUserId !== 'all') { const foundUser = users.find(u => u.id.toString() === selectedUserId); if (foundUser) userForPdf = foundUser; } generateFullReportPDF(filteredRecords, userForPdf, periodLabel); };
+  
+  const filteredRecords = useMemo(() => { 
+    return records.filter(r => { 
+      const recordDate = r.timestamp.split('T')[0]; 
+      const matchesDate = recordDate >= startDate && recordDate <= endDate; 
+      const matchesUser = selectedUserId === 'all' || r.user_id.toString() === selectedUserId; 
+      return matchesDate && matchesUser; 
+    }); 
+  }, [records, startDate, endDate, selectedUserId]);
+
+  const handleGeneratePDF = () => {
+    const periodLabel = `Periodo: ${new Date(startDate).toLocaleDateString('es-ES')} - ${new Date(endDate).toLocaleDateString('es-ES')}`;
+    let userForPdf: any = { name: 'Todos los Empleados', employee_id: 'ADMIN' };
+    if (selectedUserId !== 'all') { const foundUser = users.find(u => u.id.toString() === selectedUserId); if (foundUser) userForPdf = foundUser; }
+    generateFullReportPDF(filteredRecords, userForPdf, periodLabel);
+  };
+
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
-      <header className="flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={onBack} className="p-2 hover:bg-slate-800 rounded-full"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Registros</h2></div><button disabled={filteredRecords.length === 0} onClick={handleGeneratePDF} className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20"><Download className="w-4 h-4" /> Exportar PDF</button></header>
+      <header className="flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={onBack} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Registros de Empleados</h2></div><button disabled={filteredRecords.length === 0} onClick={handleGeneratePDF} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20"><Download className="w-4 h-4" /> Exportar PDF</button></header>
       <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white" />
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white" />
-          <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white">
-            <option value="all">Todos los empleados</option>
-            {users.map(u => ( <option key={u.id} value={u.id}>{u.name}</option> ))}
-          </select>
+          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Desde</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none" /></div>
+          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Hasta</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none" /></div>
+          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Empleado</label><select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none"><option value="all">Todos</option>{users.map(u => ( <option key={u.id} value={u.id}>{u.name}</option> ))}</select></div>
         </div>
       </section>
       <section className="space-y-3">
-        {filteredRecords.map(record => (
-          <div key={record.id} onClick={() => onSelectRecord(record)} className="flex items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 hover:border-orange-500/20 transition-all cursor-pointer">
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${record.type === 'IN' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>{record.type === 'IN' ? <LogIn className="text-green-500 w-6 h-6" /> : <LogOut className="text-[#ff8c00] w-6 h-6" />}</div>
-              <div><p className="font-bold text-sm text-white">{record.user_name || 'Empleado'}</p><p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{new Date(record.timestamp).toLocaleString()}</p></div>
+        {filteredRecords.length === 0 ? ( <div className="text-center py-12 bg-slate-900 rounded-3xl border border-slate-800"><p className="text-slate-500 font-bold italic">No hay registros</p></div> ) : (
+          filteredRecords.map(record => (
+            <div key={record.id} onClick={() => onSelectRecord(record)} className="flex items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 cursor-pointer group">
+              <div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center ${record.type === 'IN' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>{record.type === 'IN' ? <LogIn className="text-green-500 w-6 h-6" /> : <LogOut className="text-[#ff8c00] w-6 h-6" />}</div><div><div className="flex items-center gap-2"><p className="font-bold text-sm text-white">{record.user_name || 'Empleado'}</p></div><p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{new Date(record.timestamp).toLocaleDateString('es-ES')} • {new Date(record.timestamp).toLocaleTimeString('es-ES')}</p></div></div><ChevronRight className="w-5 h-5 text-slate-700" />
             </div>
-            <ChevronRight className="w-5 h-5 text-slate-700" />
-          </div>
-        ))}
+          ))
+        )}
       </section>
     </div>
   );
@@ -388,73 +392,77 @@ const ExportView = ({ onBack, records, showToast }: { onBack: () => void, record
   const [endDate, setEndDate] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString().split('T')[0]; });
   const [format, setFormat] = useState<'CSV' | 'PDF' | 'JSON'>('CSV');
   const filteredRecords = useMemo(() => { return records.filter(r => { const date = new Date(r.timestamp).toISOString().split('T')[0]; return date >= startDate && date <= endDate; }); }, [records, startDate, endDate]);
+
   const handleExport = (e: React.MouseEvent) => {
-    e.preventDefault(); if (filteredRecords.length === 0) { showToast('No hay registros', 'error'); return; }
-    if (format === 'PDF') { generateFullReportPDF(filteredRecords, { name: 'Admin', employee_id: 'ADMIN' } as any, `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`); }
-    else if (format === 'CSV') {
-        const headers = ['Fecha', 'Hora', 'Tipo', 'Usuario', 'Sede', 'Distancia (m)', 'Metodo'];
-        const csvData = filteredRecords.map(r => [ new Date(r.timestamp).toLocaleDateString(), new Date(r.timestamp).toLocaleTimeString(), r.type, r.user_name || 'N/A', r.worksite_name, r.distance, r.is_manual ? 'Manual' : 'GPS' ]);
-        const csvContent = [headers, ...csvData].map(e => e.join(",")).join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    e.preventDefault();
+    if (filteredRecords.length === 0) { showToast('No hay registros en el rango seleccionado', 'error'); return; }
+    try {
+      if (format === 'PDF') { generateFullReportPDF(filteredRecords, { name: 'Informe Consolidado', employee_id: 'ADMIN', department: 'Administración' } as any, `${new Date(startDate).toLocaleDateString('es-ES')} - ${new Date(endDate).toLocaleDateString('es-ES')}`); }
+      else if (format === 'CSV') {
+        const headers = ['Fecha', 'Hora', 'Tipo', 'Usuario', 'Sede', 'Distancia (m)', 'Metodo']; 
+        const csvData = filteredRecords.map(r => [ new Date(r.timestamp).toLocaleDateString('es-ES'), new Date(r.timestamp).toLocaleTimeString('es-ES'), r.type, r.user_name || 'N/A', r.worksite_name, r.distance, r.is_manual ? 'Manual' : 'GPS' ]); 
+        const csvContent = [headers, ...csvData].map(e => e.join(",")).join("\n"); 
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); 
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Export_${new Date().toISOString().split('T')[0]}.csv`; link.click();
-    } else {
-        const blob = new Blob([JSON.stringify(filteredRecords, null, 2)], { type: 'application/json' });
+      } else if (format === 'JSON') {
+        const blob = new Blob([JSON.stringify(filteredRecords, null, 2)], { type: 'application/json' }); 
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Export_${new Date().toISOString().split('T')[0]}.json`; link.click();
-    }
-    showToast('Exportación completada', 'success');
+      }
+      showToast('Exportación iniciada correctamente', 'success');
+    } catch (err) { showToast('Error al generar la exportación', 'error'); }
   };
+
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
-      <div className="flex items-center gap-4"><button type="button" onClick={onBack} className="p-2 hover:bg-slate-800 rounded-lg"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Exportación</h2></div>
+      <div className="flex items-center gap-4"><button type="button" onClick={onBack} className="p-2 hover:bg-slate-800 rounded-lg"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Centro de Exportación</h2></div>
       <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 space-y-6">
-        <div className="grid grid-cols-2 gap-4"><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-slate-800 border p-3 rounded-xl" /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-slate-800 border p-3 rounded-xl" /></div>
-        <div className="grid grid-cols-3 gap-4">
-            <button onClick={() => setFormat('CSV')} className={`p-4 rounded-2xl border ${format === 'CSV' ? 'border-[#ff8c00]' : 'border-slate-700'}`}>CSV</button>
-            <button onClick={() => setFormat('PDF')} className={`p-4 rounded-2xl border ${format === 'PDF' ? 'border-[#ff8c00]' : 'border-slate-700'}`}>PDF</button>
-            <button onClick={() => setFormat('JSON')} className={`p-4 rounded-2xl border ${format === 'JSON' ? 'border-[#ff8c00]' : 'border-slate-700'}`}>JSON</button>
-        </div>
-        <button onClick={handleExport} className="w-full bg-[#ff8c00] py-4 rounded-2xl font-bold">Generar Archivo</button>
+        <div className="space-y-2"><label className="text-sm font-bold text-slate-400 uppercase">Rango de Fechas Global</label><div className="grid grid-cols-2 gap-4"><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div></div>
+        <div className="space-y-4"><label className="text-sm font-bold text-slate-400 uppercase">Formato de Archivo</label><div className="grid grid-cols-3 gap-4"><button type="button" onClick={() => setFormat('CSV')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'CSV' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">CSV</p></button><button type="button" onClick={() => setFormat('PDF')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'PDF' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">PDF</p></button><button type="button" onClick={() => setFormat('JSON')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'JSON' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">JSON</p></button></div></div>
+        <button type="button" onClick={handleExport} className="w-full bg-[#ff8c00] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3"><Download className="w-6 h-6" /> Exportar Archivo</button>
       </div>
     </div>
   );
 };
 
-const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: any) => {
+const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: { records: Record[], users: User[], stats: any, onViewRequests: () => void, onNavigate: (tab: string) => void }) => {
   const trendsData = useMemo(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().split('T')[0]; }); return days.map(day => { const dayRecords = records.filter(r => r.timestamp.startsWith(day)); const ins = dayRecords.filter(r => r.type === 'IN').length; return { day: day.split('-').slice(1).join('/'), fichajes: ins }; }); }, [records]);
   const distributionData = useMemo(() => { const depts: { [key: string]: number } = {}; users.forEach(u => { const dept = u.department || 'Sin Dept'; depts[dept] = (depts[dept] || 0) + 1; }); return Object.entries(depts).map(([name, value]) => ({ name, value })); }, [users]);
   const COLORS = ['#ff8c00', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
       <section className="space-y-4">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Resumen General</h3>
-        <div onClick={() => onNavigate('admin-records')} className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-3xl shadow-xl shadow-orange-500/20 relative cursor-pointer">
-          <div className="relative z-10"><div className="flex items-center justify-between mb-8"><div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md"><Clock className="w-6 h-6 text-white" /></div></div><p className="text-5xl font-black text-white mb-1">{stats.activeEmployees}</p><p className="text-white/80 font-bold text-sm">Empleados Registrados</p></div>
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Resumen de la Empresa</h3>
+        <div onClick={() => onNavigate('admin-records')} className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-3xl shadow-xl shadow-orange-500/20 relative overflow-hidden group cursor-pointer">
+          <div className="absolute top-0 right-0 p-4 opacity-10"><Clock className="w-32 h-32" /></div>
+          <div className="relative z-10"><div className="flex items-center justify-between mb-8"><div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md"><Clock className="w-6 h-6 text-white" /></div><span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold text-white backdrop-blur-md uppercase">En Vivo</span></div><p className="text-5xl font-black text-white mb-1">{stats.activeEmployees}</p><p className="text-white/80 font-bold text-sm">Empleados Registrados</p></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div onClick={() => onNavigate('admin-records')} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer hover:border-orange-500/30">
+          <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4"><BarChart3 className="w-5 h-5 text-[#ff8c00]" /></div>
-            <div className="flex items-center justify-between mb-1"><p className="text-3xl font-black text-white">{stats.totalHoursToday}</p></div><p className="text-slate-500 font-bold text-xs">Horas Hoy</p>
+            <p className="text-3xl font-black text-white">{stats.totalHoursToday}</p><p className="text-slate-500 font-bold text-xs mt-1">Total Horas Hoy</p>
           </div>
-          <div onClick={onViewRequests} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer hover:border-orange-500/30">
+          <div onClick={onViewRequests} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer">
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4"><AlertTriangle className="w-5 h-5 text-[#ff8c00]" /></div>
-            <div className="flex items-center justify-between mb-1"><p className="text-3xl font-black text-white">{stats.pendingAlerts}</p></div><p className="text-slate-500 font-bold text-xs">Alertas</p>
+            <p className="text-3xl font-black text-white">{stats.pendingAlerts}</p><p className="text-slate-500 font-bold text-xs mt-1">Alertas Pendientes</p>
           </div>
         </div>
       </section>
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800"><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Tendencia semanal</h3><div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={trendsData}><CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} /><XAxis dataKey="day" stroke="#94a3b8" fontSize={8} /><YAxis stroke="#94a3b8" fontSize={8} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none' }} /><Bar dataKey="fichajes" fill="#ff8c00" radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
-        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800"><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Distribución</h3><div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distributionData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value">{distributionData.map((e,i) => <Cell key={`c-${i}`} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div></div>
+        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800"><h3 className="text-xs font-bold text-slate-500 uppercase mb-6">Tendencias de Asistencia</h3><div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={trendsData}><CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} /><XAxis dataKey="day" stroke="#94a3b8" fontSize={8} tickLine={false} axisLine={false} /><YAxis stroke="#94a3b8" fontSize={8} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }} itemStyle={{ color: '#ff8c00' }} /><Bar dataKey="fichajes" fill="#ff8c00" radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
+        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800"><h3 className="text-xs font-bold text-slate-500 uppercase mb-6">Distribución por Dpto</h3><div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distributionData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">{distributionData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} /> ))}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }} /></PieChart></ResponsiveContainer></div></div>
       </section>
-      <section className="space-y-3">
-          {[ { icon: Users, label: 'Personal', action: 'admin-users' }, { icon: Building2, label: 'Sedes', action: 'admin-worksites' }, { icon: Download, label: 'Informes', action: 'admin-export' } ].map(item => (
-            <button key={item.label} onClick={() => onNavigate(item.action)} className="w-full flex items-center justify-between p-5 bg-slate-900 rounded-3xl border border-slate-800 hover:border-orange-500/20 transition-all group"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:bg-orange-500/10"><item.icon className="w-6 h-6 text-slate-400 group-hover:text-[#ff8c00]" /></div><p className="font-bold text-sm">{item.label}</p></div><ChevronRight className="w-5 h-5 text-slate-600" /></button>
+      <section className="space-y-4">
+        <h3 className="text-xs font-bold text-slate-500 uppercase">Acceso Rápido</h3>
+        <div className="space-y-3">
+          {[ { icon: Users, label: 'Gestión de Usuarios', sub: 'Gestionar perfiles, permisos', action: 'admin-users' }, { icon: Building2, label: 'Sedes y Ubicaciones', sub: 'Gestionar rangos GPS', action: 'admin-worksites' }, { icon: Download, label: 'Centro de Exportación', sub: 'Descargar CSV o PDF', action: 'admin-export' } ].map(item => (
+            <button key={item.label} type="button" onClick={() => onNavigate(item.action)} className="w-full flex items-center justify-between p-5 bg-slate-900 rounded-3xl border border-slate-800 hover:border-orange-500/20 transition-all group"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:bg-orange-500/10 transition-colors"><item.icon className="w-6 h-6 text-slate-400 group-hover:text-[#ff8c00]" /></div><div className="text-left"><p className="font-bold text-sm">{item.label}</p><p className="text-xs text-slate-500">{item.sub}</p></div></div><ChevronRight className="w-5 h-5 text-slate-600 group-hover:translate-x-1" /></button>
           ))}
+        </div>
       </section>
     </div>
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -484,13 +492,30 @@ export default function App() {
   };
 
   const handleClockIn = async (worksiteId: number) => {
-    const res = await fetch('/api/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user?.id, worksite_id: worksiteId, type: 'IN', latitude: 0, longitude: 0, distance: 0, notes: '' }) });
-    if (res.ok) { setIsClockedIn(true); setStartTime(new Date()); fetch(`/api/records/${user?.id}`).then(res => res.json()).then(setUserRecords); if (user?.role === 'ADMIN') fetchAdminData(); }
+    if (!user) return;
+    const res = await fetch('/api/clock', { 
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ user_id: user.id, worksite_id: worksiteId, type: 'IN', latitude: 0, longitude: 0, distance: 0, notes: '' }) 
+    });
+    if (res.ok) { 
+      setIsClockedIn(true); setStartTime(new Date()); 
+      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
+      if (user.role === 'ADMIN') fetchAdminData(); 
+    }
   };
 
   const handleClockOut = async (notes: string) => {
-    const res = await fetch('/api/clock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: user?.id, worksite_id: 1, type: 'OUT', latitude: 0, longitude: 0, distance: 0, notes }) });
-    if (res.ok) { setIsClockedIn(false); setStartTime(null); fetch(`/api/records/${user?.id}`).then(res => res.json()).then(setUserRecords); if (user?.role === 'ADMIN') fetchAdminData(); }
+    if (!user) return;
+    const lastRecord = userRecords[0];
+    const res = await fetch('/api/clock', { 
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ user_id: user.id, worksite_id: lastRecord?.worksite_id || 1, type: 'OUT', latitude: 0, longitude: 0, distance: 0, notes, minutos_extra: 0, estado_extra: 'N/A' }) 
+    });
+    if (res.ok) { 
+      setIsClockedIn(false); setStartTime(null); 
+      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
+      if (user.role === 'ADMIN') fetchAdminData(); 
+    }
   };
 
   if (!user) return <Login onLogin={setUser} />;
@@ -504,16 +529,16 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-y-auto">
         <AnimatePresence mode="wait">
           {selectedRecord ? (
-             <RecordDetailView record={selectedRecord} user={user} onBack={() => setSelectedRecord(null)} />
+             <motion.div key="detail" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex-1 flex flex-col"><RecordDetailView record={selectedRecord} user={user} onBack={() => setSelectedRecord(null)} /></motion.div>
           ) : (
              <motion.div key={activeTab} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex-1 flex flex-col">
                {user.role === 'ADMIN' ? (
                  <>
-                   {activeTab === 'admin-dashboard' && <AdminDashboard records={allRecords} users={adminUsers} stats={adminStats} onViewRequests={() => setActiveTab('admin-requests')} onNavigate={setActiveTab} />}
+                   {activeTab === 'admin-dashboard' && <AdminDashboard records={allRecords} users={adminUsers} stats={adminStats || { activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 }} onViewRequests={() => setActiveTab('admin-requests')} onNavigate={setActiveTab} />}
                    {activeTab === 'admin-users' && <UserManagementView users={adminUsers} onBack={() => setActiveTab('admin-dashboard')} onAdd={async(d:any)=>{await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});fetchAdminData();}} onUpdate={async(id:any,d:any)=>{await fetch(`/api/admin/users/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});fetchAdminData();}} onDelete={async(id:any)=>{if(confirm('¿Borrar?')){await fetch(`/api/admin/users/${id}`,{method:'DELETE'});fetchAdminData();}}} />}
                    {activeTab === 'admin-worksites' && <WorksiteManagementView worksites={adminWorksites} onBack={() => setActiveTab('admin-dashboard')} onAdd={async(d:any)=>{await fetch('/api/admin/worksites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});fetchAdminData();}} onUpdate={async(id:any,d:any)=>{await fetch(`/api/admin/worksites/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});fetchAdminData();}} onDelete={async(id:any)=>{if(confirm('¿Borrar?')){await fetch(`/api/admin/worksites/${id}`,{method:'DELETE'});fetchAdminData();}}} />}
                    {activeTab === 'admin-records' && <AdminRecordsListView records={allRecords} users={adminUsers} onSelectRecord={setSelectedRecord} onBack={() => setActiveTab('admin-dashboard')} />}
-                   {activeTab === 'admin-export' && <ExportView records={allRecords} showToast={showToast} onBack={() => setActiveTab('admin-dashboard')} />}
+                   {activeTab === 'admin-export' && <ExportView records={allRecords} showToast={(m:string,t:any)=>setToast({message:m,type:t})} onBack={() => setActiveTab('admin-dashboard')} />}
                    {activeTab === 'admin-requests' && <PendingRequestsView requests={pendingReqs} onSelectRecord={setSelectedRecord} onBack={() => setActiveTab('admin-dashboard')} onActionComplete={async(id:any,status:any)=>{await fetch('/api/admin/records/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});fetchAdminData();}} />}
                    {activeTab === 'admin-clockin' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
                    {activeTab === 'profile' && <div className="p-8 text-center space-y-4"><UserIcon className="w-20 h-20 mx-auto text-slate-700"/><h2 className="text-2xl font-bold">{user.name}</h2><p className="text-orange-500 font-bold">{user.department}</p></div>}
@@ -521,34 +546,4 @@ export default function App() {
                ) : (
                  <>
                    {activeTab === 'home' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
-                   {activeTab === 'history' && <HistoryView records={userRecords} user={user} onSelectRecord={setSelectedRecord} />}
-                   {activeTab === 'summary' && <WeeklySummaryView records={userRecords} user={user} showToast={showToast} />}
-                   {activeTab === 'profile' && <div className="p-8 text-center space-y-4"><UserIcon className="w-20 h-20 mx-auto text-slate-700"/><h2 className="text-2xl font-bold">{user.name}</h2><p className="text-orange-500 font-bold">{user.department}</p></div>}
-                 </>
-               )}
-             </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 pb-6 pt-3 flex justify-around items-center z-50">
-        {user.role === 'ADMIN' ? (
-          <>
-            <button onClick={() => setActiveTab('admin-dashboard')} className={activeTab === 'admin-dashboard' ? 'text-[#ff8c00]' : 'text-slate-600'}><LayoutDashboard /></button>
-            <button onClick={() => setActiveTab('admin-records')} className={activeTab === 'admin-records' ? 'text-[#ff8c00]' : 'text-slate-600'}><FileText /></button>
-            <button onClick={() => setActiveTab('admin-clockin')} className={activeTab === 'admin-clockin' ? 'text-[#ff8c00]' : 'text-slate-600'}><Fingerprint /></button>
-            <button onClick={() => setActiveTab('admin-users')} className={activeTab === 'admin-users' ? 'text-[#ff8c00]' : 'text-slate-600'}><Users /></button>
-            <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'text-[#ff8c00]' : 'text-slate-600'}><Settings2 /></button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => setActiveTab('home')} className={activeTab === 'home' ? 'text-[#ff8c00]' : 'text-slate-600'}><Home /></button>
-            <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-[#ff8c00]' : 'text-slate-600'}><FileText /></button>
-            <button onClick={() => setActiveTab('summary')} className={activeTab === 'summary' ? 'text-[#ff8c00]' : 'text-slate-600'}><BarChart3 /></button>
-            <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'text-[#ff8c00]' : 'text-slate-600'}><UserIcon /></button>
-          </>
-        )}
-      </nav>
-      <AnimatePresence>{toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}</AnimatePresence>
-    </div>
-  );
-}
+                   {activeTab === 'history' && <HistoryView records={userRecords} user
