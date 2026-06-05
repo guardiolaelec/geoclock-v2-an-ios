@@ -512,15 +512,24 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
     return () => clearInterval(interval);
   }, []);
 
-  // NUEVO: Averiguamos quién está trabajando en este mismo instante
+  // NUEVO: Averiguamos quién está trabajando en este mismo instante (A PRUEBA DE ZOMBIS)
   const activeSessions = useMemo(() => {
     const sessions: any[] = [];
+    const todayStr = new Date().toDateString(); // La fecha de hoy
+
     users.forEach(u => {
-      // Ordenamos los registros del usuario del más nuevo al más antiguo
-      const userRecords = records.filter(r => r.user_id === u.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      // Si tiene registros y el último es una "Entrada", está trabajando
-      if (userRecords.length > 0 && userRecords[0].type === 'IN') {
-        sessions.push({ user: u, record: userRecords[0], startTime: new Date(userRecords[0].timestamp).getTime() });
+      // 1. Filtramos asegurando que el ID coincida exactamente (usando toString por seguridad)
+      const userRecords = records.filter(r => r.user_id.toString() === u.id.toString())
+                                 .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      if (userRecords.length > 0) {
+        const lastRecord = userRecords[0];
+        // 2. Solo está trabajando si su último fichaje es IN *Y* fue en el día de hoy
+        const isFromToday = new Date(lastRecord.timestamp).toDateString() === todayStr;
+        
+        if (lastRecord.type === 'IN' && isFromToday) {
+          sessions.push({ user: u, record: lastRecord, startTime: new Date(lastRecord.timestamp).getTime() });
+        }
       }
     });
     return sessions;
