@@ -387,17 +387,33 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
   );
 };
 
-const ExportView = ({ onBack, records, showToast }: { onBack: () => void, records: Record[], showToast: (msg: string, type: 'success' | 'error') => void }) => {
+const ExportView = ({ onBack, records, users, showToast }: { onBack: () => void, records: Record[], users: User[], showToast: (msg: string, type: 'success' | 'error') => void }) => {
   const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString().split('T')[0]; });
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [format, setFormat] = useState<'CSV' | 'PDF' | 'JSON'>('CSV');
-  const filteredRecords = useMemo(() => { return records.filter(r => { const date = new Date(r.timestamp).toISOString().split('T')[0]; return date >= startDate && date <= endDate; }); }, [records, startDate, endDate]);
+  
+  const filteredRecords = useMemo(() => { 
+    return records.filter(r => { 
+      const date = new Date(r.timestamp).toISOString().split('T')[0]; 
+      const matchesDate = date >= startDate && date <= endDate;
+      const matchesUser = selectedUserId === 'all' || r.user_id.toString() === selectedUserId;
+      return matchesDate && matchesUser; 
+    }); 
+  }, [records, startDate, endDate, selectedUserId]);
 
   const handleExport = (e: React.MouseEvent) => {
     e.preventDefault();
     if (filteredRecords.length === 0) { showToast('No hay registros en el rango seleccionado', 'error'); return; }
     try {
-      if (format === 'PDF') { generateFullReportPDF(filteredRecords, { name: 'Informe Consolidado', employee_id: 'ADMIN', department: 'Administración' } as any, `${new Date(startDate).toLocaleDateString('es-ES')} - ${new Date(endDate).toLocaleDateString('es-ES')}`); }
+      if (format === 'PDF') { 
+        let userForPdf: any = { name: 'Informe Consolidado', employee_id: 'ADMIN', department: 'Administración' };
+        if (selectedUserId !== 'all') {
+          const foundUser = users.find(u => u.id.toString() === selectedUserId);
+          if (foundUser) userForPdf = foundUser;
+        }
+        generateFullReportPDF(filteredRecords, userForPdf, `${new Date(startDate).toLocaleDateString('es-ES')} - ${new Date(endDate).toLocaleDateString('es-ES')}`); 
+      }
       else if (format === 'CSV') {
         const headers = ['Fecha', 'Hora', 'Tipo', 'Usuario', 'Sede', 'Distancia (m)', 'Metodo']; 
         const csvData = filteredRecords.map(r => [ new Date(r.timestamp).toLocaleDateString('es-ES'), new Date(r.timestamp).toLocaleTimeString('es-ES'), r.type, r.user_name || 'N/A', r.worksite_name, r.distance, r.is_manual ? 'Manual' : 'GPS' ]); 
@@ -408,7 +424,7 @@ const ExportView = ({ onBack, records, showToast }: { onBack: () => void, record
         const blob = new Blob([JSON.stringify(filteredRecords, null, 2)], { type: 'application/json' }); 
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Export_${new Date().toISOString().split('T')[0]}.json`; link.click();
       }
-      showToast('Exportación iniciada correctamente', 'success');
+      showToast('Exportación completada', 'success');
     } catch (err) { showToast('Error al generar la exportación', 'error'); }
   };
 
@@ -416,14 +432,24 @@ const ExportView = ({ onBack, records, showToast }: { onBack: () => void, record
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
       <div className="flex items-center gap-4"><button type="button" onClick={onBack} className="p-2 hover:bg-slate-800 rounded-lg"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Centro de Exportación</h2></div>
       <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 space-y-6">
-        <div className="space-y-2"><label className="text-sm font-bold text-slate-400 uppercase">Rango de Fechas Global</label><div className="grid grid-cols-2 gap-4"><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div></div>
+        
+        <div className="space-y-2"><label className="text-sm font-bold text-slate-400 uppercase">Rango de Fechas</label><div className="grid grid-cols-2 gap-4"><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div></div>
+        
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-slate-400 uppercase">Filtro de Empleado</label>
+          <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white outline-none">
+            <option value="all">Todos los empleados</option>
+            {users.map(u => ( <option key={u.id} value={u.id}>{u.name}</option> ))}
+          </select>
+        </div>
+
         <div className="space-y-4"><label className="text-sm font-bold text-slate-400 uppercase">Formato de Archivo</label><div className="grid grid-cols-3 gap-4"><button type="button" onClick={() => setFormat('CSV')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'CSV' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">CSV</p></button><button type="button" onClick={() => setFormat('PDF')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'PDF' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">PDF</p></button><button type="button" onClick={() => setFormat('JSON')} className={`p-4 bg-slate-800 border rounded-2xl text-center ${format === 'JSON' ? 'border-[#ff8c00] bg-orange-500/10' : 'border-slate-700'}`}><p className="font-bold">JSON</p></button></div></div>
-        <button type="button" onClick={handleExport} className="w-full bg-[#ff8c00] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3"><Download className="w-6 h-6" /> Exportar Archivo</button>
+        
+        <button type="button" onClick={handleExport} className="w-full bg-[#ff8c00] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3"><Download className="w-6 h-6" /> Exportar ({filteredRecords.length} registros)</button>
       </div>
     </div>
   );
 };
-
 const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: { records: Record[], users: User[], stats: any, onViewRequests: () => void, onNavigate: (tab: string) => void }) => {
   const trendsData = useMemo(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().split('T')[0]; }); return days.map(day => { const dayRecords = records.filter(r => r.timestamp.startsWith(day)); const ins = dayRecords.filter(r => r.type === 'IN').length; return { day: day.split('-').slice(1).join('/'), fichajes: ins }; }); }, [records]);
   const distributionData = useMemo(() => { const depts: { [key: string]: number } = {}; users.forEach(u => { const dept = u.department || 'Sin Dept'; depts[dept] = (depts[dept] || 0) + 1; }); return Object.entries(depts).map(([name, value]) => ({ name, value })); }, [users]);
