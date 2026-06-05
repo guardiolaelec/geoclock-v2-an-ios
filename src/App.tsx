@@ -264,31 +264,86 @@ const RecordDetailView = ({ record, user, onBack }: { record: Record, user: User
   </div>
 );
 
-const WeeklySummaryView = ({ records, user, showToast }: { records: Record[], user: User, showToast: (msg: string, type: 'success' | 'error') => void }) => (
-  <div className="flex-1 p-6 text-center space-y-6 font-['Quicksand'] pb-24">
-    <h2 className="text-2xl font-bold mt-4">Informes Generales</h2>
-    <button onClick={() => { generateFullReportPDF(records, user); showToast('Informe PDF Generado', 'success'); }} className="w-full bg-[#ff8c00] py-4 rounded-xl font-bold flex justify-center gap-2"><FileText /> Descargar Informe</button>
-  </div>
-);
+const WeeklySummaryView = ({ records, user, showToast }: { records: Record[], user: User, showToast: (msg: string, type: 'success' | 'error') => void }) => {
+  const [now, setNow] = useState(new Date().getTime());
 
-const UserModal = ({ user, onSave, onClose }: { user?: User, onSave: (u: any) => Promise<void>, onClose: () => void }) => {
-  const [f, setF] = useState({ 
-    name: user?.name || '', email: user?.email || '', password: user?.password || '123456', 
-    employee_id: user?.employee_id || '', department: user?.department || '', role: user?.role || 'USER'
-  });
+  // Refrescar el contador cada minuto si hay un turno en curso
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date().getTime()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { todaysRecords, totalStr, enCurso } = useMemo(() => {
+    const today = new Date().toDateString();
+    const todayRecs = records.filter(r => new Date(r.timestamp).toDateString() === today)
+                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    let totalMs = 0;
+    let isInProgress = false;
+    const sortedForCalc = [...todayRecs].reverse(); // Ordenamos de más antiguo a más nuevo para calcular pares
+    
+    for (let i = 0; i < sortedForCalc.length; i++) {
+      if (sortedForCalc[i].type === 'IN') {
+         if (i + 1 < sortedForCalc.length && sortedForCalc[i+1].type === 'OUT') {
+           // Turno cerrado
+           totalMs += new Date(sortedForCalc[i+1].timestamp).getTime() - new Date(sortedForCalc[i].timestamp).getTime();
+           i++;
+         } else {
+           // Turno abierto (en curso)
+           isInProgress = true;
+           totalMs += now - new Date(sortedForCalc[i].timestamp).getTime();
+         }
+      }
+    }
+
+    const h = Math.floor(totalMs / 3600000);
+    const m = Math.floor((totalMs % 3600000) / 60000);
+    
+    return { todaysRecords: todayRecs, totalStr: `${h}h ${m.toString().padStart(2, '0')}m`, enCurso: isInProgress };
+  }, [records, now]);
+
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60]">
-      <div className="bg-slate-950 border border-slate-800 p-6 rounded-3xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-2xl font-bold">{user ? 'Editar' : 'Añadir'} Empleado</h3>
-        <input placeholder="Nombre" value={f.name} onChange={e=>setF({...f,name:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl" />
-        <input placeholder="Email" value={f.email} onChange={e=>setF({...f,email:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl" />
-        <input placeholder="Contraseña" value={f.password} onChange={e=>setF({...f,password:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl" />
-        <div className="grid grid-cols-2 gap-3">
-          <input placeholder="ID (EMP-01)" value={f.employee_id} onChange={e=>setF({...f,employee_id:e.target.value})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl w-full" />
-          <select value={f.role} onChange={e=>setF({...f,role:e.target.value as 'USER'|'ADMIN'})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl w-full"><option value="USER">Usuario</option><option value="ADMIN">Admin</option></select>
+    <div className="flex-1 p-6 space-y-6 font-['Quicksand'] pb-24 overflow-y-auto">
+      <h2 className="text-2xl font-bold mt-4 text-center">Resumen de Actividad</h2>
+
+      <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Actividad de Hoy</h3>
+          {enCurso && <span className="bg-orange-500/20 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black animate-pulse">EN CURSO</span>}
+          {!enCurso && todaysRecords.length > 0 && <span className="bg-green-500/20 text-green-500 px-3 py-1 rounded-full text-[10px] font-black">FINALIZADO</span>}
+          {todaysRecords.length === 0 && <span className="bg-slate-800 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black">SIN DATOS</span>}
         </div>
-        <div className="flex gap-2 mt-4"><button onClick={()=>onSave(f)} className="flex-1 bg-orange-500 p-3 rounded-xl font-bold">Guardar</button><button onClick={onClose} className="flex-1 bg-slate-800 p-3 rounded-xl text-slate-400">Cancelar</button></div>
+        
+        <div className="mb-6 pb-6 border-b border-slate-800">
+           <p className="text-4xl font-black text-white">{todaysRecords.length > 0 ? totalStr : '0h 00m'}</p>
+           <p className="text-xs text-slate-500 font-bold mt-1">Tiempo total registrado hoy</p>
+        </div>
+
+        <div className="space-y-3">
+          {todaysRecords.length === 0 ? (
+             <p className="text-center text-sm text-slate-500 italic py-4">Aún no has fichado hoy.</p>
+          ) : (
+            todaysRecords.map(record => (
+              <div key={record.id} className="flex justify-between items-center bg-slate-950 p-4 rounded-2xl border border-slate-800/50 hover:border-orange-500/20 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${record.type === 'IN' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>
+                    {record.type === 'IN' ? <LogIn className="w-5 h-5 text-green-500" /> : <LogOut className="w-5 h-5 text-[#ff8c00]" />}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">{record.type === 'IN' ? 'Entrada' : 'Salida'}</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">{record.worksite_name}</p>
+                  </div>
+                </div>
+                <p className="font-black text-lg text-white">{new Date(record.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      <button onClick={() => { generateFullReportPDF(records, user); showToast('Informe PDF Generado', 'success'); }} className="w-full bg-[#ff8c00] py-4 rounded-2xl font-bold flex justify-center items-center gap-3 text-white shadow-xl shadow-orange-500/20 active:scale-95 transition-all">
+        <FileText className="w-5 h-5" /> Descargar Informe Completo
+      </button>
     </div>
   );
 };
