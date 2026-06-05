@@ -585,8 +585,8 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
       {/* SECCIÓN ORIGINAL DE FILTROS */}
       <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Desde</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none" /></div>
-          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Hasta</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none" /></div>
+          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Desde</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none [color-scheme:dark]" /></div>
+          <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Hasta</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none [color-scheme:dark]" /></div>
           <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Empleado</label><select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none"><option value="all">Todos</option>{users.map(u => ( <option key={u.id} value={u.id}>{u.name}</option> ))}</select></div>
         </div>
       </section>
