@@ -348,12 +348,114 @@ const WeeklySummaryView = ({ records, user, showToast }: { records: Record[], us
   );
 };
 
-const UserManagementView = ({ users, onAdd, onUpdate, onDelete, onBack }: any) => {
-  const [show, setShow] = useState(false); const [edit, setEdit] = useState<any>();
+const UserModal = ({ user, onSave, onClose }: { user?: any, onSave: (u: any) => Promise<void>, onClose: () => void }) => {
+  const [f, setF] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    password: user?.password || '', 
+    employee_id: user?.employee_id || '',
+    department: user?.department || '',
+    role: user?.role || 'USER'
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      await onSave(f);
+      onClose(); // Esto es vital: Cierra la ventana tras guardar
+    } catch (error) {
+      console.error(error);
+      alert("Error al procesar el usuario.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex-1 p-6 space-y-4 overflow-y-auto pb-24"><div className="flex gap-4 items-center mb-6"><button onClick={onBack}><ArrowLeft/></button><h2 className="text-2xl font-bold flex-1">Usuarios</h2> <button onClick={()=>{setEdit(null);setShow(true);}} className="bg-[#ff8c00] p-2 rounded-xl"><Plus/></button></div>
-    {users.map((u:any) => (<div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center"><div><p className="font-bold">{u.name}</p><p className="text-xs text-slate-500">{u.role}</p></div><div className="flex gap-2"><button onClick={()=>{setEdit(u);setShow(true);}} className="p-2"><Edit3 className="w-5 text-slate-500"/></button><button onClick={()=>onDelete(u.id)} className="p-2"><Trash className="w-5 text-red-500"/></button></div></div>))}
-    {show && <UserModal user={edit} onClose={()=>setShow(false)} onSave={edit?(d:any)=>onUpdate(edit.id,d):onAdd} />}</div>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60]">
+      <div className="bg-slate-950 border border-slate-800 p-6 rounded-3xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-2xl font-bold">{user ? 'Editar Empleado' : 'Añadir Empleado'}</h3>
+        <div className="space-y-3">
+          <input placeholder="Nombre Completo" value={f.name} onChange={e=>setF({...f,name:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+          <input placeholder="Email" value={f.email} onChange={e=>setF({...f,email:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+          <input placeholder={user ? "Nueva Contraseña (dejar en blanco para no cambiar)" : "Contraseña"} value={f.password} onChange={e=>setF({...f,password:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" type="password" />
+          <div className="grid grid-cols-2 gap-3">
+            <input placeholder="ID (Ej: EMP-01)" value={f.employee_id} onChange={e=>setF({...f,employee_id:e.target.value})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+            <select value={f.role} onChange={e=>setF({...f,role:e.target.value as 'USER'|'ADMIN'})} className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500">
+              <option value="USER">Usuario</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+          </div>
+          <input placeholder="Departamento (Ej: Ventas)" value={f.department} onChange={e=>setF({...f,department:e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button onClick={handleSubmit} disabled={loading} className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 p-3 rounded-xl font-bold text-white transition-colors">
+            {loading ? 'Guardando...' : 'Guardar'}
+          </button>
+          <button onClick={onClose} disabled={loading} className="flex-1 bg-slate-800 hover:bg-slate-700 p-3 rounded-xl text-slate-400 font-bold transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const UserManagementView = ({ users, onAdd, onUpdate, onDelete, onBack }: any) => {
+  const [show, setShow] = useState(false);
+  const [edit, setEdit] = useState<any>(null);
+
+  return (
+    <div className="flex-1 p-6 space-y-4 overflow-y-auto pb-24 font-['Quicksand']">
+      <div className="flex gap-4 items-center mb-6">
+        <button onClick={onBack} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><ArrowLeft/></button>
+        <h2 className="text-2xl font-bold flex-1">Gestión de Usuarios</h2>
+        <button onClick={()=>{setEdit(null);setShow(true);}} className="bg-orange-500 hover:bg-orange-600 p-3 rounded-xl text-white shadow-lg shadow-orange-500/20 transition-transform active:scale-95">
+          <Plus className="w-5 h-5"/>
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {(users || []).map((u:any) => (
+          <div key={u.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center hover:border-orange-500/30 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
+                <UserIcon className="w-5 h-5 text-slate-400" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">{u.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">{u.department || 'Sin Dpto'}</span>
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${u.role === 'ADMIN' ? 'bg-orange-500/20 text-orange-500' : 'bg-blue-500/20 text-blue-500'}`}>{u.role}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={()=>{setEdit(u);setShow(true);}} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"><Edit3 className="w-5 h-5"/></button>
+              <button onClick={()=>onDelete(u.id)} className="p-2 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Trash className="w-5 h-5"/></button>
+            </div>
+          </div>
+        ))}
+        {users?.length === 0 && <p className="text-center text-slate-500 italic py-10">No hay usuarios registrados</p>}
+      </div>
+
+      {show && (
+        <UserModal
+          user={edit}
+          onClose={() => setShow(false)}
+          onSave={async (data: any) => {
+            if (edit) {
+              const updateData = { ...data };
+              if (!updateData.password) delete updateData.password; // Si está en blanco, no actualizamos la contraseña
+              await onUpdate(edit.id, updateData);
+            } else {
+              await onAdd(data);
+            }
+          }}
+        />
+      )}
+    </div>
   );
 };
 
