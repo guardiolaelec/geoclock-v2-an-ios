@@ -18,8 +18,6 @@ const supabase = createClient(
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // 1. Traemos TODOS los usuarios (sin filtros estrictos de base de datos)
     const { data: users, error } = await supabase.from('users').select('*');
     
     if (error) {
@@ -27,12 +25,14 @@ app.post("/api/login", async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    // 2. Búsqueda a prueba de balas en JavaScript (Destruye espacios, \r, \n y mayúsculas)
     const user = users.find(u => {
-      const dbEmail = u.email ? u.email.replace(/[\r\n\s]+/g, '').toLowerCase() : '';
-      const dbPass = u.password ? u.password.replace(/[\r\n\s]+/g, '') : '';
-      const inputEmail = email ? email.replace(/[\r\n\s]+/g, '').toLowerCase() : '';
-      const inputPass = password ? password.replace(/[\r\n\s]+/g, '') : '';
+      // Limpiamos los saltos de línea del CSV, pero NO los espacios en blanco
+      const dbEmail = u.email ? u.email.replace(/[\r\n]+/g, '').trim().toLowerCase() : '';
+      const dbPass = u.password ? u.password.replace(/[\r\n]+/g, '').trim() : '';
+      
+      const inputEmail = email ? email.trim().toLowerCase() : '';
+      const inputPass = password ? password.trim() : '';
+      
       return dbEmail === inputEmail && dbPass === inputPass;
     });
 
