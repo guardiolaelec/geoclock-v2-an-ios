@@ -647,6 +647,42 @@ const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: {
 };
 
 const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ old: '', new: '', confirm: '' });
+  const [pwdStatus, setPwdStatus] = useState({ loading: false, error: '', success: false });
+
+  const handlePasswordChange = async () => {
+    if (pwdForm.new !== pwdForm.confirm) {
+      setPwdStatus({ ...pwdStatus, error: 'Las contraseñas nuevas no coinciden' });
+      return;
+    }
+    if (pwdForm.new.length < 6) {
+      setPwdStatus({ ...pwdStatus, error: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    setPwdStatus({ loading: true, error: '', success: false });
+    try {
+      const res = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id, oldPassword: pwdForm.old, newPassword: pwdForm.new })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Error al cambiar la contraseña');
+      
+      setPwdStatus({ loading: false, error: '', success: true });
+      setTimeout(() => {
+        setShowPwdModal(false);
+        setPwdForm({ old: '', new: '', confirm: '' });
+        setPwdStatus({ loading: false, error: '', success: false });
+      }, 2000); // Cerramos el modal tras 2 segundos de éxito
+    } catch (err: any) {
+      setPwdStatus({ loading: false, error: err.message, success: false });
+    }
+  };
+
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] pb-24 overflow-y-auto">
       <h2 className="text-2xl font-bold mt-4 text-center">Mi Perfil</h2>
@@ -669,7 +705,7 @@ const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) =
       <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
         <div className="p-5 border-b border-slate-800 flex items-center gap-3 bg-slate-800/20">
           <Verified className="w-5 h-5 text-[#ff8c00]" />
-          <h4 className="font-bold text-slate-300">Datos de la Empresa</h4>
+          <h4 className="font-bold text-slate-300">Datos de la Cuenta</h4>
         </div>
         <div className="p-5 space-y-4">
           <div className="flex justify-between items-center pb-4 border-b border-slate-800/50">
@@ -684,9 +720,11 @@ const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) =
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Departamento</p>
             <p className="font-bold text-white">{user.department || 'Sin Dpto.'}</p>
           </div>
-          <div className="flex justify-between items-center">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado de Cuenta</p>
-            <span className="bg-green-500/10 border border-green-500/20 text-green-500 px-3 py-1 rounded-full text-[10px] font-black uppercase">Activo</span>
+          <div className="flex justify-between items-center mt-2 pt-2">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Seguridad</p>
+            <button onClick={() => setShowPwdModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors">
+              <Lock className="w-3 h-3" /> Cambiar Contraseña
+            </button>
           </div>
         </div>
       </div>
@@ -695,10 +733,51 @@ const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) =
       <button onClick={onLogout} className="w-full bg-red-500/10 border border-red-500/20 py-4 rounded-2xl font-bold flex justify-center items-center gap-3 text-red-500 active:scale-95 transition-all mt-6 hover:bg-red-500/20">
         <LogOut className="w-5 h-5" /> Cerrar Sesión
       </button>
+
+      {/* Modal de Cambio de Contraseña */}
+      <AnimatePresence>
+        {showPwdModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[70] backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-slate-950 border border-slate-800 p-6 rounded-3xl w-full max-w-sm space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">Cambiar Contraseña</h3>
+                <button onClick={() => setShowPwdModal(false)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+
+              {pwdStatus.success ? (
+                <div className="bg-green-500/10 border border-green-500/20 p-6 rounded-2xl text-center space-y-3">
+                  <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+                  <p className="text-green-500 font-bold">¡Contraseña actualizada!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pwdStatus.error && <p className="text-red-500 text-xs font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{pwdStatus.error}</p>}
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Contraseña Actual</label>
+                    <input type="password" value={pwdForm.old} onChange={e => setPwdForm({...pwdForm, old: e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Nueva Contraseña</label>
+                    <input type="password" value={pwdForm.new} onChange={e => setPwdForm({...pwdForm, new: e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Confirmar Nueva Contraseña</label>
+                    <input type="password" value={pwdForm.confirm} onChange={e => setPwdForm({...pwdForm, confirm: e.target.value})} className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white outline-none focus:border-orange-500" />
+                  </div>
+
+                  <button onClick={handlePasswordChange} disabled={pwdStatus.loading || !pwdForm.old || !pwdForm.new} className="w-full bg-orange-500 disabled:opacity-50 hover:bg-orange-600 p-4 rounded-xl font-bold text-white transition-colors mt-4">
+                    {pwdStatus.loading ? 'Actualizando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('home');
