@@ -941,7 +941,7 @@ export default function App() {
                    {activeTab === 'home' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
                    {activeTab === 'history' && <HistoryView records={userRecords} user={user} onSelectRecord={setSelectedRecord} />}
                    {activeTab === 'summary' && <WeeklySummaryView records={userRecords} user={user} showToast={(m:string,t:any)=>setToast({message:m,type:t})} />}
-                   {activeTab === 'profile' && <ProfileView user={user} onLogout={() => setUser(null)} />}
+                   {activeTab === 'profile' && <ProfileView user={user} onLogout={() => { setUser(null); setActiveTab('home'); }} />}
                  </>
                )}
              </motion.div>
