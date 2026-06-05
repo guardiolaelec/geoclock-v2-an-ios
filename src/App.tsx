@@ -493,31 +493,46 @@ export default function App() {
 
   const handleClockIn = async (worksiteId: number) => {
     if (!user) return;
-    const res = await fetch('/api/clock', { 
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ user_id: user.id, worksite_id: worksiteId, type: 'IN', latitude: 0, longitude: 0, distance: 0, notes: '' }) 
-    });
-    if (res.ok) { 
-      setIsClockedIn(true); setStartTime(new Date()); 
-      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
-      if (user.role === 'ADMIN') fetchAdminData(); 
+    try {
+      const res = await fetch('/api/clock', { 
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user?.id, worksite_id: worksiteId, type: 'IN', latitude: 0, longitude: 0, distance: 0 })
+      });
+      
+      if (res.ok) {
+        setIsClockedIn(true); setStartTime(new Date());
+        const r = await fetch(`/api/records/${user?.id}`);
+        setUserRecords(await r.json());
+      } else {
+        // ESTO NOS MOSTRARÁ EL ERROR REAL DE SUPABASE
+        const err = await res.json();
+        alert(`Error al fichar: ${err.error || JSON.stringify(err)}`);
+      }
+    } catch (e: any) {
+      alert(`Error de red: ${e.message}`);
     }
   };
 
   const handleClockOut = async (notes: string) => {
     if (!user) return;
-    const lastRecord = userRecords[0];
-    const res = await fetch('/api/clock', { 
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ user_id: user.id, worksite_id: lastRecord?.worksite_id || 1, type: 'OUT', latitude: 0, longitude: 0, distance: 0, notes, minutos_extra: 0, estado_extra: 'N/A' }) 
-    });
-    if (res.ok) { 
-      setIsClockedIn(false); setStartTime(null); 
-      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords); 
-      if (user.role === 'ADMIN') fetchAdminData(); 
+    try {
+      const res = await fetch('/api/clock', { 
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user?.id, type: 'OUT', notes })
+      });
+      
+      if (res.ok) {
+        setIsClockedIn(false); setStartTime(null);
+        const r = await fetch(`/api/records/${user?.id}`);
+        setUserRecords(await r.json());
+      } else {
+        const err = await res.json();
+        alert(`Error al salir: ${err.error || JSON.stringify(err)}`);
+      }
+    } catch (e: any) {
+      alert(`Error de red: ${e.message}`);
     }
   };
-
   if (!user) return <Login onLogin={setUser} />;
 
   return (
