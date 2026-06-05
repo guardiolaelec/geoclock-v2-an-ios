@@ -505,6 +505,27 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
   const [endDate, setEndDate] = useState(() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString().split('T')[0]; });
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   
+  // NUEVO: Estado para el reloj en tiempo real del panel de administrador
+  const [now, setNow] = useState(new Date().getTime());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date().getTime()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // NUEVO: Averiguamos quién está trabajando en este mismo instante
+  const activeSessions = useMemo(() => {
+    const sessions: any[] = [];
+    users.forEach(u => {
+      // Ordenamos los registros del usuario del más nuevo al más antiguo
+      const userRecords = records.filter(r => r.user_id === u.id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      // Si tiene registros y el último es una "Entrada", está trabajando
+      if (userRecords.length > 0 && userRecords[0].type === 'IN') {
+        sessions.push({ user: u, record: userRecords[0], startTime: new Date(userRecords[0].timestamp).getTime() });
+      }
+    });
+    return sessions;
+  }, [records, users]);
+
   const filteredRecords = useMemo(() => { 
     return records.filter(r => { 
       const recordDate = r.timestamp.split('T')[0]; 
@@ -524,6 +545,44 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
       <header className="flex items-center justify-between"><div className="flex items-center gap-3"><button onClick={onBack} className="p-2 hover:bg-slate-800 rounded-full transition-colors"><ArrowLeft className="w-6 h-6" /></button><h2 className="text-2xl font-bold">Registros de Empleados</h2></div><button disabled={filteredRecords.length === 0} onClick={handleGeneratePDF} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20"><Download className="w-4 h-4" /> Exportar PDF</button></header>
+      
+      {/* NUEVA SECCIÓN: EN ESTOS MOMENTOS (Solo se muestra si hay alguien trabajando) */}
+      {activeSessions.length > 0 && (
+        <section className="bg-slate-900 p-6 rounded-3xl border border-green-500/20 shadow-xl shadow-green-500/5 space-y-4">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Trabajando en estos momentos ({activeSessions.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeSessions.map(session => {
+              const diff = now - session.startTime;
+              const h = Math.floor(diff / 3600000);
+              const m = Math.floor((diff % 3600000) / 60000);
+              const s = Math.floor((diff % 60000) / 1000);
+              return (
+                <div key={session.user.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-white">{session.user.name}</p>
+                      <p className="text-[10px] text-slate-500 uppercase">{session.record.worksite_name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-black text-green-500 tabular-nums tracking-widest">
+                      {h.toString().padStart(2, '0')}:{m.toString().padStart(2, '0')}:{s.toString().padStart(2, '0')}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* SECCIÓN ORIGINAL DE FILTROS */}
       <section className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Desde</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none" /></div>
@@ -531,11 +590,13 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
           <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Empleado</label><select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 px-4 text-white outline-none"><option value="all">Todos</option>{users.map(u => ( <option key={u.id} value={u.id}>{u.name}</option> ))}</select></div>
         </div>
       </section>
+      
+      {/* SECCIÓN ORIGINAL DE LISTA DE REGISTROS */}
       <section className="space-y-3">
         {filteredRecords.length === 0 ? ( <div className="text-center py-12 bg-slate-900 rounded-3xl border border-slate-800"><p className="text-slate-500 font-bold italic">No hay registros</p></div> ) : (
           filteredRecords.map(record => (
-            <div key={record.id} onClick={() => onSelectRecord(record)} className="flex items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 cursor-pointer group">
-              <div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center ${record.type === 'IN' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>{record.type === 'IN' ? <LogIn className="text-green-500 w-6 h-6" /> : <LogOut className="text-[#ff8c00] w-6 h-6" />}</div><div><div className="flex items-center gap-2"><p className="font-bold text-sm text-white">{record.user_name || 'Empleado'}</p></div><p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{new Date(record.timestamp).toLocaleDateString('es-ES')} • {new Date(record.timestamp).toLocaleTimeString('es-ES')}</p></div></div><ChevronRight className="w-5 h-5 text-slate-700" />
+            <div key={record.id} onClick={() => onSelectRecord(record)} className="flex items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 cursor-pointer group hover:border-orange-500/20 transition-colors">
+              <div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center ${record.type === 'IN' ? 'bg-green-500/10' : 'bg-orange-500/10'}`}>{record.type === 'IN' ? <LogIn className="text-green-500 w-6 h-6" /> : <LogOut className="text-[#ff8c00] w-6 h-6" />}</div><div><div className="flex items-center gap-2"><p className="font-bold text-sm text-white">{record.user_name || 'Empleado'}</p></div><p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{new Date(record.timestamp).toLocaleDateString('es-ES')} • {new Date(record.timestamp).toLocaleTimeString('es-ES')}</p></div></div><ChevronRight className="w-5 h-5 text-slate-700 group-hover:text-orange-500 transition-colors" />
             </div>
           ))
         )}
