@@ -792,14 +792,14 @@ export default function App() {
                    {activeTab === 'admin-export' && <ExportView records={allRecords} users={adminUsers} showToast={(m:string,t:any)=>setToast({message:m,type:t})} onBack={() => setActiveTab('admin-dashboard')} />}
                    {activeTab === 'admin-requests' && <PendingRequestsView requests={pendingReqs} onSelectRecord={setSelectedRecord} onBack={() => setActiveTab('admin-dashboard')} onActionComplete={async(id:any,status:any)=>{await fetch('/api/admin/records/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});fetchAdminData();}} />}
                    {activeTab === 'admin-clockin' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
-                   {activeTab === 'profile' && <div className="p-8 text-center space-y-4"><UserIcon className="w-20 h-20 mx-auto text-slate-700"/><h2 className="text-2xl font-bold">{user.name}</h2><p className="text-orange-500 font-bold">{user.department}</p></div>}
+                   {activeTab === 'profile' && <ProfileView user={user} onLogout={() => setUser(null)} />}
                  </>
                ) : (
                  <>
                    {activeTab === 'home' && (isClockedIn ? <ActiveSession user={user} startTime={startTime!} onFinish={handleClockOut} onDiscard={() => { setIsClockedIn(false); setStartTime(null); }} /> : <Dashboard user={user} records={userRecords} onClockIn={handleClockIn} />)}
                    {activeTab === 'history' && <HistoryView records={userRecords} user={user} onSelectRecord={setSelectedRecord} />}
                    {activeTab === 'summary' && <WeeklySummaryView records={userRecords} user={user} showToast={(m:string,t:any)=>setToast({message:m,type:t})} />}
-                   {activeTab === 'profile' && <div className="p-8 text-center space-y-4"><UserIcon className="w-20 h-20 mx-auto text-slate-700"/><h2 className="text-2xl font-bold">{user.name}</h2><p className="text-orange-500 font-bold">{user.department}</p></div>}
+                   {activeTab === 'profile' && <ProfileView user={user} onLogout={() => setUser(null)} />}
                  </>
                )}
              </motion.div>
