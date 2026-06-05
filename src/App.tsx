@@ -917,7 +917,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-['Quicksand'] relative">
       <header className="flex justify-between items-center p-4 border-b border-orange-500/10 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-2"><Clock className="text-[#ff8c00]" /><h2 className="font-bold text-lg">GeoClock</h2></div>
-        <button onClick={() => setUser(null)} className="p-2 text-slate-500 hover:text-red-500 transition-colors"><LogOut /></button>
+        <button onClick={() => { setUser(null); setActiveTab('home'); }} className="p-2 text-slate-500 hover:text-red-500 transition-colors"><LogOut /></button>
       </header>
       <main className="flex-1 flex flex-col overflow-y-auto">
         <AnimatePresence mode="wait">
