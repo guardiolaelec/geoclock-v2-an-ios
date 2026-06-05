@@ -646,6 +646,59 @@ const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: {
   );
 };
 
+const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
+  return (
+    <div className="flex-1 p-6 space-y-6 font-['Quicksand'] pb-24 overflow-y-auto">
+      <h2 className="text-2xl font-bold mt-4 text-center">Mi Perfil</h2>
+
+      {/* Cabecera del Perfil */}
+      <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl text-center space-y-4">
+        <div className="w-24 h-24 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center mx-auto shadow-inner relative overflow-hidden">
+          <UserIcon className="w-12 h-12 text-[#ff8c00]" />
+          <div className="absolute bottom-0 w-full h-1/3 bg-gradient-to-t from-black/50 to-transparent"></div>
+        </div>
+        <div>
+          <h3 className="text-2xl font-black text-white">{user.name}</h3>
+          <p className={`font-bold text-sm uppercase tracking-widest mt-1 ${user.role === 'ADMIN' ? 'text-orange-500' : 'text-blue-400'}`}>
+            {user.role === 'ADMIN' ? 'Administrador' : 'Empleado'}
+          </p>
+        </div>
+      </div>
+
+      {/* Detalles del Empleado */}
+      <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
+        <div className="p-5 border-b border-slate-800 flex items-center gap-3 bg-slate-800/20">
+          <Verified className="w-5 h-5 text-[#ff8c00]" />
+          <h4 className="font-bold text-slate-300">Datos de la Empresa</h4>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex justify-between items-center pb-4 border-b border-slate-800/50">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ID Empleado</p>
+            <p className="font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{user.employee_id || 'NO ASIGNADO'}</p>
+          </div>
+          <div className="flex justify-between items-center pb-4 border-b border-slate-800/50">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</p>
+            <p className="font-medium text-slate-300">{user.email}</p>
+          </div>
+          <div className="flex justify-between items-center pb-4 border-b border-slate-800/50">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Departamento</p>
+            <p className="font-bold text-white">{user.department || 'Sin Dpto.'}</p>
+          </div>
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado de Cuenta</p>
+            <span className="bg-green-500/10 border border-green-500/20 text-green-500 px-3 py-1 rounded-full text-[10px] font-black uppercase">Activo</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Botón de Cerrar Sesión */}
+      <button onClick={onLogout} className="w-full bg-red-500/10 border border-red-500/20 py-4 rounded-2xl font-bold flex justify-center items-center gap-3 text-red-500 active:scale-95 transition-all mt-6 hover:bg-red-500/20">
+        <LogOut className="w-5 h-5" /> Cerrar Sesión
+      </button>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('home');
