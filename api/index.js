@@ -185,7 +185,16 @@ app.post("/api/clock", async (req, res) => {
 });
 
 app.get("/api/status/:id", async (req, res) => {
-  const { data } = await supabase.from('fichajes').select('*').eq('empleado_id', req.params.id).order('fecha_hora', { ascending: false }).limit(1);
+  // Sacamos la fecha de hoy a las 00:00
+  const hoy = new Date().toISOString().split('T')[0];
+  
+  // Buscamos solo en los fichajes DE HOY
+  const { data } = await supabase.from('fichajes').select('*')
+    .eq('empleado_id', req.params.id)
+    .gte('fecha_hora', hoy)
+    .order('fecha_hora', { ascending: false })
+    .limit(1);
+    
   if (data && data.length > 0 && data[0].tipo === 'Entrada Jornada') {
     return res.json({ isClockedIn: true, startTime: data[0].fecha_hora });
   }
