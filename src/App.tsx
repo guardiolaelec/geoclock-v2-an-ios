@@ -858,14 +858,16 @@ export default function App() {
     if (user) {
       fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords);
       fetch(`/api/status/${user.id}`).then(res => res.json()).then(s => { if (s.isClockedIn) { setIsClockedIn(true); setStartTime(new Date(s.startTime)); } });
-      if (user.role === 'ADMIN') { if (!activeTab.startsWith('admin-')) { setActiveTab('admin-dashboard'); } fetchAdminData(); }
+      
+      if (user.role === 'ADMIN') { 
+        if (!activeTab.startsWith('admin-')) { setActiveTab('admin-dashboard'); } 
+        fetchAdminData(); 
+      } else {
+        // Si es un usuario normal y venía de una pestaña de admin, lo forzamos a Inicio
+        if (activeTab.startsWith('admin-')) { setActiveTab('home'); }
+      }
     }
   }, [user]);
-
-  const fetchAdminData = async () => {
-    const [s, u, w, r, p] = await Promise.all([ fetch('/api/admin/stats').then(res => res.json()), fetch('/api/admin/users').then(res => res.json()), fetch('/api/admin/worksites').then(res => res.json()), fetch('/api/admin/records').then(res => res.json()), fetch('/api/admin/pending-records').then(res => res.json()) ]);
-    setAdminStats(s); setAdminUsers(u); setAdminWorksites(w); setAllRecords(r); setPendingReqs(p);
-  };
 
   const handleClockIn = async (worksiteId: number) => {
     if (!user) return;
