@@ -880,17 +880,46 @@ export default function App() {
   const [adminStats, setAdminStats] = useState({ activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 });
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);
 
+  // 1. ELIMINA LOS RELOJES FANTASMA: Borra todo al salir
+  const handleLogout = () => {
+    setUser(null);
+    setActiveTab('home');
+    setIsClockedIn(false);
+    setStartTime(null);
+    setUserRecords([]);
+    setAllRecords([]);
+    setSelectedRecord(null);
+  };
+
+  // 2. RECUPERA LOS DATOS: La función que había desaparecido
+  const fetchAdminData = async () => {
+    try {
+      const [statsRes, usersRes, worksitesRes, recordsRes, pendingRes] = await Promise.all([
+        fetch('/api/admin/stats').then(res => res.json()).catch(() => ({ activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 })),
+        fetch('/api/admin/users').then(res => res.json()).catch(() => []),
+        fetch('/api/admin/worksites').then(res => res.json()).catch(() => []),
+        fetch('/api/admin/records').then(res => res.json()).catch(() => []),
+        fetch('/api/admin/pending-records').then(res => res.json()).catch(() => [])
+      ]);
+      
+      setAdminStats(statsRes && !statsRes.error ? statsRes : { activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 });
+      setAdminUsers(Array.isArray(usersRes) ? usersRes : []);
+      setAdminWorksites(Array.isArray(worksitesRes) ? worksitesRes : []);
+      setAllRecords(Array.isArray(recordsRes) ? recordsRes : []);
+      setPendingReqs(Array.isArray(pendingRes) ? pendingRes : []);
+    } catch (error) {
+      console.error("Error cargando datos de admin:", error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      // 1. ELIMINAR EL ESTADO FANTASMA: Limpiamos la memoria antes de consultar al servidor
       setIsClockedIn(false);
       setStartTime(null);
       setUserRecords([]);
       
-      // 2. Cargamos sus datos reales
       fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords);
       fetch(`/api/status/${user.id}`).then(res => res.json()).then(s => { 
-        // Obligamos a la app a aceptar lo que diga el servidor, sea true o false
         setIsClockedIn(s.isClockedIn || false); 
         setStartTime(s.startTime ? new Date(s.startTime) : null); 
       }).catch(() => {
@@ -898,29 +927,9 @@ export default function App() {
         setStartTime(null);
       });
       
-      // 3. Forzamos la pestaña correcta para que la pantalla nunca quede en blanco
       if (user.role === 'ADMIN') { 
         setActiveTab('admin-dashboard'); 
-        const fetchAdminData = async () => {
-    try {
-      const [s, u, w, r, p] = await Promise.all([ 
-        fetch('/api/admin/stats').then(res => res.json()).catch(() => ({ activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 })), 
-        fetch('/api/admin/users').then(res => res.json()).catch(() => []), 
-        fetch('/api/admin/worksites').then(res => res.json()).catch(() => []), 
-        fetch('/api/admin/records').then(res => res.json()).catch(() => []), 
-        fetch('/api/admin/pending-records').then(res => res.json()).catch(() => []) 
-      ]);
-      
-      // ESCUDO ANTIMISILES: Forzamos a que si la API falla, React reciba listas vacías en vez de crashear
-      setAdminStats(s && !s.error ? s : { activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 }); 
-      setAdminUsers(Array.isArray(u) ? u : []); 
-      setAdminWorksites(Array.isArray(w) ? w : []); 
-      setAllRecords(Array.isArray(r) ? r : []); 
-      setPendingReqs(Array.isArray(p) ? p : []);
-    } catch (error) {
-      console.error("Error al cargar los datos de administración:", error);
-    }
-  };
+        fetchAdminData(); 
       } else {
         setActiveTab('home'); 
       }
