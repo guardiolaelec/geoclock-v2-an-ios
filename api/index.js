@@ -258,16 +258,24 @@ app.get("/api/admin/stats", async (req, res) => {
 
 app.get("/api/admin/pending-records", async (req, res) => {
   try {
-    const { data, error } = await supabase.from('fichajes').select('*, users(name), sedes(nombre)')
+    const { data: fichajes, error } = await supabase.from('fichajes').select('*')
       .or('distancia_metros.gt.100,estado_extra.eq.PENDIENTE')
       .order('fecha_hora', { ascending: false });
-    if (error || !data) return res.json([]);
+    if (error || !fichajes) return res.json([]);
     
-    const formateado = data.map(r => ({
-      id: r.id, user_name: r.users?.name || 'Usuario desconocido', worksite_name: r.sedes?.nombre || 'Sede desconocida', type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', timestamp: r.fecha_hora, notes: r.notes || 'Revisión requerida', is_manual: false,
-      distance: r.distancia_metros, 
-      minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
-    }));
+    const { data: users } = await supabase.from('users').select('id, name');
+    const { data: sedes } = await supabase.from('sedes').select('id, nombre');
+
+    const formateado = fichajes.map(r => {
+      const user = users?.find(u => u.id.toString() === r.empleado_id?.toString());
+      const sede = sedes?.find(s => s.id.toString() === r.sede_id?.toString());
+      return {
+        id: r.id, user_name: user?.name || 'Usuario desconocido', worksite_name: sede?.nombre || 'Sede desconocida', 
+        type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', timestamp: r.fecha_hora, notes: r.notes || 'Revisión requerida', is_manual: false,
+        distance: r.distancia_metros, 
+        minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
+      };
+    });
     res.json(formateado);
   } catch (err) {
     res.json([]);
