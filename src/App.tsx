@@ -677,26 +677,43 @@ const ExportView = ({ onBack, records, users, showToast }: { onBack: () => void,
     </div>
   );
 };
-const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: { records: Record[], users: User[], stats: any, onViewRequests: () => void, onNavigate: (tab: string) => void }) => {
-  const trendsData = useMemo(() => { const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().split('T')[0]; }); return days.map(day => { const dayRecords = records.filter(r => r.timestamp.startsWith(day)); const ins = dayRecords.filter(r => r.type === 'IN').length; return { day: day.split('-').slice(1).join('/'), fichajes: ins }; }); }, [records]);
-  const distributionData = useMemo(() => { const depts: { [key: string]: number } = {}; users.forEach(u => { const dept = u.department || 'Sin Dept'; depts[dept] = (depts[dept] || 0) + 1; }); return Object.entries(depts).map(([name, value]) => ({ name, value })); }, [users]);
+const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: any) => {
+  const trendsData = useMemo(() => { 
+    const safeRecords = records || [];
+    const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().split('T')[0]; }); 
+    return days.map(day => { 
+      const dayRecords = safeRecords.filter((r:any) => r.timestamp && r.timestamp.startsWith(day)); 
+      const ins = dayRecords.filter((r:any) => r.type === 'IN').length; 
+      return { day: day.split('-').slice(1).join('/'), fichajes: ins }; 
+    }); 
+  }, [records]);
+  
+  const distributionData = useMemo(() => { 
+    const safeUsers = users || [];
+    const depts: { [key: string]: number } = {}; 
+    safeUsers.forEach((u:any) => { const dept = u.department || 'Sin Dept'; depts[dept] = (depts[dept] || 0) + 1; }); 
+    return Object.entries(depts).map(([name, value]) => ({ name, value })); 
+  }, [users]);
+  
   const COLORS = ['#ff8c00', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const safeStats = stats || { activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 };
+
   return (
     <div className="flex-1 p-6 space-y-6 font-['Quicksand'] overflow-y-auto pb-24">
       <section className="space-y-4">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Resumen de la Empresa</h3>
         <div onClick={() => onNavigate('admin-records')} className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-3xl shadow-xl shadow-orange-500/20 relative overflow-hidden group cursor-pointer">
           <div className="absolute top-0 right-0 p-4 opacity-10"><Clock className="w-32 h-32" /></div>
-          <div className="relative z-10"><div className="flex items-center justify-between mb-8"><div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md"><Clock className="w-6 h-6 text-white" /></div><span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold text-white backdrop-blur-md uppercase">En Vivo</span></div><p className="text-5xl font-black text-white mb-1">{stats.activeEmployees}</p><p className="text-white/80 font-bold text-sm">Empleados Registrados</p></div>
+          <div className="relative z-10"><div className="flex items-center justify-between mb-8"><div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md"><Clock className="w-6 h-6 text-white" /></div><span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-bold text-white backdrop-blur-md uppercase">En Vivo</span></div><p className="text-5xl font-black text-white mb-1">{safeStats.activeEmployees}</p><p className="text-white/80 font-bold text-sm">Empleados Registrados</p></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4"><BarChart3 className="w-5 h-5 text-[#ff8c00]" /></div>
-            <p className="text-3xl font-black text-white">{stats.totalHoursToday}</p><p className="text-slate-500 font-bold text-xs mt-1">Total Horas Hoy</p>
+            <p className="text-3xl font-black text-white">{safeStats.totalHoursToday}</p><p className="text-slate-500 font-bold text-xs mt-1">Total Horas Hoy</p>
           </div>
           <div onClick={onViewRequests} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer">
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4"><AlertTriangle className="w-5 h-5 text-[#ff8c00]" /></div>
-            <p className="text-3xl font-black text-white">{stats.pendingAlerts}</p><p className="text-slate-500 font-bold text-xs mt-1">Alertas Pendientes</p>
+            <p className="text-3xl font-black text-white">{safeStats.pendingAlerts}</p><p className="text-slate-500 font-bold text-xs mt-1">Alertas Pendientes</p>
           </div>
         </div>
       </section>
@@ -715,7 +732,6 @@ const AdminDashboard = ({ records, users, stats, onViewRequests, onNavigate }: {
     </div>
   );
 };
-
 const ProfileView = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [pwdForm, setPwdForm] = useState({ old: '', new: '', confirm: '' });
