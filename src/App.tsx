@@ -901,7 +901,26 @@ export default function App() {
       // 3. Forzamos la pestaña correcta para que la pantalla nunca quede en blanco
       if (user.role === 'ADMIN') { 
         setActiveTab('admin-dashboard'); 
-        fetchAdminData(); 
+        const fetchAdminData = async () => {
+    try {
+      const [s, u, w, r, p] = await Promise.all([ 
+        fetch('/api/admin/stats').then(res => res.json()).catch(() => ({ activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 })), 
+        fetch('/api/admin/users').then(res => res.json()).catch(() => []), 
+        fetch('/api/admin/worksites').then(res => res.json()).catch(() => []), 
+        fetch('/api/admin/records').then(res => res.json()).catch(() => []), 
+        fetch('/api/admin/pending-records').then(res => res.json()).catch(() => []) 
+      ]);
+      
+      // ESCUDO ANTIMISILES: Forzamos a que si la API falla, React reciba listas vacías en vez de crashear
+      setAdminStats(s && !s.error ? s : { activeEmployees: 0, totalHoursToday: 0, pendingAlerts: 0 }); 
+      setAdminUsers(Array.isArray(u) ? u : []); 
+      setAdminWorksites(Array.isArray(w) ? w : []); 
+      setAllRecords(Array.isArray(r) ? r : []); 
+      setPendingReqs(Array.isArray(p) ? p : []);
+    } catch (error) {
+      console.error("Error al cargar los datos de administración:", error);
+    }
+  };
       } else {
         setActiveTab('home'); 
       }
