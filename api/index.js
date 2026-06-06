@@ -133,13 +133,23 @@ app.delete(["/api/worksites/:id", "/api/admin/worksites/:id"], async (req, res) 
 // ==========================================
 app.get("/api/records/:id", async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from('fichajes').select('*, sedes(nombre)').eq('empleado_id', id).order('fecha_hora', { ascending: false });
-  if (error || !data) return res.json([]);
+  // 1. Pedimos los fichajes simples
+  const { data: fichajes, error } = await supabase.from('fichajes').select('*').eq('empleado_id', id).order('fecha_hora', { ascending: false });
+  if (error || !fichajes) return res.json([]);
   
-  const formateado = data.map(r => ({
-    id: r.id, user_id: r.empleado_id, worksite_id: r.sede_id, type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', latitude: r.latitud, longitude: r.longitud, distance: r.distancia_metros, notes: r.notes, timestamp: r.fecha_hora, worksite_name: r.sedes?.nombre || 'Sede desconocida',
-    minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
-  }));
+  // 2. Pedimos las sedes
+  const { data: sedes } = await supabase.from('sedes').select('id, nombre');
+
+  // 3. Los cruzamos a mano a prueba de fallos
+  const formateado = fichajes.map(r => {
+    const sede = sedes?.find(s => s.id.toString() === r.sede_id?.toString());
+    return {
+      id: r.id, user_id: r.empleado_id, worksite_id: r.sede_id, type: r.tipo === 'Entrada Jornada' ? 'IN' : 'OUT', 
+      latitude: r.latitud, longitude: r.longitud, distance: r.distancia_metros, notes: r.notes, timestamp: r.fecha_hora, 
+      worksite_name: sede?.nombre || 'Sede desconocida',
+      minutos_extra: r.minutos_extra, estado_extra: r.estado_extra
+    };
+  });
   res.json(formateado);
 });
 
