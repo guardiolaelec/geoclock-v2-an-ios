@@ -865,15 +865,28 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
-      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords);
-      fetch(`/api/status/${user.id}`).then(res => res.json()).then(s => { if (s.isClockedIn) { setIsClockedIn(true); setStartTime(new Date(s.startTime)); } });
+      // 1. ELIMINAR EL ESTADO FANTASMA: Limpiamos la memoria antes de consultar al servidor
+      setIsClockedIn(false);
+      setStartTime(null);
+      setUserRecords([]);
       
+      // 2. Cargamos sus datos reales
+      fetch(`/api/records/${user.id}`).then(res => res.json()).then(setUserRecords);
+      fetch(`/api/status/${user.id}`).then(res => res.json()).then(s => { 
+        // Obligamos a la app a aceptar lo que diga el servidor, sea true o false
+        setIsClockedIn(s.isClockedIn || false); 
+        setStartTime(s.startTime ? new Date(s.startTime) : null); 
+      }).catch(() => {
+        setIsClockedIn(false);
+        setStartTime(null);
+      });
+      
+      // 3. Forzamos la pestaña correcta para que la pantalla nunca quede en blanco
       if (user.role === 'ADMIN') { 
-        if (!activeTab.startsWith('admin-')) { setActiveTab('admin-dashboard'); } 
+        setActiveTab('admin-dashboard'); 
         fetchAdminData(); 
       } else {
-        // Si es un usuario normal y venía de una pestaña de admin, lo forzamos a Inicio
-        if (activeTab.startsWith('admin-')) { setActiveTab('home'); }
+        setActiveTab('home'); 
       }
     }
   }, [user]);
