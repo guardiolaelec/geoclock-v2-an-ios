@@ -512,20 +512,21 @@ const AdminRecordsListView = ({ records, users, onSelectRecord, onBack }: { reco
     return () => clearInterval(interval);
   }, []);
 
-  // NUEVO: Averiguamos quién está trabajando en este mismo instante (A PRUEBA DE ZOMBIS)
+  // NUEVO: Cálculo a prueba de fallos y sin zombis
   const activeSessions = useMemo(() => {
     const sessions: any[] = [];
-    const todayStr = new Date().toDateString(); // La fecha de hoy
+    const todayStr = new Date().toDateString(); 
+    
+    const safeUsers = users || [];
+    const safeRecords = records || [];
 
-    users.forEach(u => {
-      // 1. Filtramos asegurando que el ID coincida exactamente (usando toString por seguridad)
-      const userRecords = records.filter(r => r.user_id.toString() === u.id.toString())
+    safeUsers.forEach(u => {
+      const userRecords = safeRecords.filter(r => r.user_id && u.id && r.user_id.toString() === u.id.toString())
                                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       
       if (userRecords.length > 0) {
         const lastRecord = userRecords[0];
-        // 2. Solo está trabajando si su último fichaje es IN *Y* fue en el día de hoy
-        const isFromToday = new Date(lastRecord.timestamp).toDateString() === todayStr;
+        const isFromToday = lastRecord.timestamp && new Date(lastRecord.timestamp).toDateString() === todayStr;
         
         if (lastRecord.type === 'IN' && isFromToday) {
           sessions.push({ user: u, record: lastRecord, startTime: new Date(lastRecord.timestamp).getTime() });
