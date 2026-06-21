@@ -1,7 +1,6 @@
 {
-  "version": 2,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/((?!assets/|pwa-|manifest|registerSW|sw|favicon).*)", "destination": "/index.html" }
   ]
 }
