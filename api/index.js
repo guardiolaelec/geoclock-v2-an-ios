@@ -296,6 +296,42 @@ app.post("/api/admin/records/approve", async (req, res) => {
   }
 });
 
+app.post("/api/admin/records/approve", async (req, res) => {
+  try {
+    const { id, status } = req.body;
+    if (status === 'REJECTED') {
+      await supabase.from('fichajes').update({ estado_extra: 'RECHAZADO', minutos_extra: 0 }).eq('id', id);
+    } else {
+      await supabase.from('fichajes').update({ distancia_metros: 0, estado_extra: 'APROBADO', notes: 'Aprobado por el Administrador' }).eq('id', id);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/records/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { timestamp, type, notes, worksite_id, estado_extra } = req.body;
+    
+    // Preparamos los datos que el administrador quiere modificar
+    const updateData = {};
+    if (timestamp) updateData.fecha_hora = timestamp;
+    if (type) updateData.tipo = type === 'IN' ? 'Entrada Jornada' : 'Salida Jornada';
+    if (notes !== undefined) updateData.notes = notes;
+    if (worksite_id) updateData.sede_id = worksite_id;
+    if (estado_extra) updateData.estado_extra = estado_extra;
+
+    const { data, error } = await supabase.from('fichajes').update(updateData).eq('id', id).select();
+    
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // 6. PERFIL DE USUARIO
 // ==========================================
