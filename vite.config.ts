@@ -7,13 +7,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon-192x192.png', 'icon-512x512.png'],
+      // No te olvides de incluir los nuevos archivos aquí para que se cacheen
+      includeAssets: ['favicon.ico', 'icon-192x192.png', 'icon-512x512.png', 'screenshot-mobile.png', 'screenshot-desktop.png'],
       manifest: {
-        name: 'GeoClock',
+        name: 'GeoClock Guardiola',
         short_name: 'GeoClock',
         description: 'Control de fichajes geolocalizado',
-        theme_color: '#1e293b',
-        background_color: '#ffffff',
+        theme_color: '#ff8c00', /* Ajustado al naranja de tu app */
+        background_color: '#0f172a', /* Ajustado al fondo oscuro de tu app (slate-950) */
         display: 'standalone',
         scope: '/',
         start_url: '/',
@@ -27,6 +28,21 @@ export default defineConfig({
             src: '/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          }
+        ],
+        // AQUÍ ESTÁ LA MAGIA PARA LA INSTALACIÓN "PREMIUM" Y QUITAR AVISOS
+        screenshots: [
+          {
+            src: '/screenshot-mobile.png',
+            sizes: '1080x1920',
+            type: 'image/png',
+            form_factor: 'narrow'
+          },
+          {
+            src: '/screenshot-desktop.png',
+            sizes: '1920x1080',
+            type: 'image/png',
+            form_factor: 'wide'
           }
         ]
       },
