@@ -21,12 +21,12 @@ export default defineConfig({
         icons: [
           {
             src: '/icon-192x192.png',
-            sizes: '192x192',
+            sizes: '384x384', // <-- CAMBIA ESTO PARA QUE COINCIDA CON LA REALIDAD
             type: 'image/png'
           },
           {
             src: '/icon-512x512.png',
-            sizes: '512x512',
+            sizes: '1024x1024', // <-- CAMBIA ESTO PARA QUE COINCIDA CON LA REALIDAD
             type: 'image/png'
           }
         ],
